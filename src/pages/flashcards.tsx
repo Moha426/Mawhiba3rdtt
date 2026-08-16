@@ -51,7 +51,7 @@ export default function FlashcardsPage() {
 
   // Combined cards list
   const cards = useMemo(() => {
-    const list = Array.isArray(sharedCards) && sharedCards.length > 0 ? sharedCards : DEFAULT_FLASHCARDS;
+    const list = Array.isArray(sharedCards) ? sharedCards : DEFAULT_FLASHCARDS;
     return [...personalCards, ...list];
   }, [personalCards, sharedCards]);
 

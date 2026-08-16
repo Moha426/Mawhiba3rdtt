@@ -452,11 +452,11 @@ export function Layout({ children }: LayoutProps) {
 
       {/* ─── Mobile top header ─── */}
       <header
-        className="lg:hidden fixed top-3 inset-x-3 z-50 h-16 rounded-[42px] flex items-center px-5 gap-2"
+        className="lg:hidden fixed top-3 inset-x-2.5 sm:inset-x-3 z-50 h-14 sm:h-16 rounded-[42px] flex items-center px-3 sm:px-4 gap-1.5 sm:gap-2 overflow-hidden"
         style={{
           background: theme === "dark"
-            ? "rgba(15, 10, 30, 0.55)"
-            : "rgba(255, 255, 255, 0.55)",
+            ? "rgba(15, 10, 30, 0.75)"
+            : "rgba(255, 255, 255, 0.85)",
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
           border: theme === "dark"
@@ -470,43 +470,47 @@ export function Layout({ children }: LayoutProps) {
         <motion.div
           onClick={handleAdminEasterEgg}
           whileTap={{ scale: 0.92 }}
-          className="cursor-pointer select-none py-1 flex items-center shrink-0"
+          className="cursor-pointer select-none py-1 flex items-center shrink-0 min-w-0"
         >
-          <AppLogo className="h-10 sm:h-12 w-auto max-w-[130px] sm:max-w-[150px]" />
+          <AppLogo className="h-8 sm:h-11 w-auto max-w-[100px] sm:max-w-[140px]" />
         </motion.div>
         {siteSettings?.schoolName && (
-          <span className="text-xs font-semibold text-foreground/70 truncate max-w-[120px]">
+          <span className="hidden md:inline-block text-xs font-semibold text-foreground/70 truncate max-w-[100px]">
             {siteSettings.schoolName}
           </span>
         )}
-        <div className="flex-1" />
-        {studentProfile && <NotificationBell />}
-        <ColorThemePicker popupDirection="down" />
-        <ThemeButton />
-        {studentProfile ? (
-          <Link href="/profile">
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-primary/10 text-primary rounded-full border border-primary/20 cursor-pointer"
-            >
-              <div className="h-5 w-5 rounded-full overflow-hidden bg-primary/20 flex items-center justify-center shrink-0">
-                {studentProfile.profilePicture ? (
-                  <img src={studentProfile.profilePicture} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-[9px] font-bold text-primary">{studentProfile.displayName.charAt(0)}</span>
-                )}
-              </div>
-              <span className="text-xs font-semibold max-w-[80px] truncate">{studentProfile.displayName}</span>
-            </motion.div>
-          </Link>
-        ) : (
-          <Link href="/sign-in">
-            <Button variant="ghost" size="sm" className="h-8 text-xs text-primary hover:bg-primary/5 rounded-lg px-3">
-              دخول
-            </Button>
-          </Link>
-        )}
+        <div className="flex-1 min-w-0" />
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {studentProfile && <NotificationBell />}
+          <ColorThemePicker popupDirection="down" />
+          <ThemeButton />
+          {studentProfile ? (
+            <Link href="/profile">
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 bg-primary/10 text-primary rounded-full border border-primary/20 cursor-pointer shrink-0 max-w-[85px] sm:max-w-[120px]"
+              >
+                <div className="h-5 w-5 rounded-full overflow-hidden bg-primary/20 flex items-center justify-center shrink-0">
+                  {studentProfile.profilePicture ? (
+                    <img src={studentProfile.profilePicture} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-[9px] font-bold text-primary">{studentProfile.displayName.charAt(0)}</span>
+                  )}
+                </div>
+                <span className="text-[11px] sm:text-xs font-semibold truncate leading-none">
+                  {studentProfile.displayName.split(" ")[0]}
+                </span>
+              </motion.div>
+            </Link>
+          ) : (
+            <Link href="/sign-in">
+              <Button variant="ghost" size="sm" className="h-7 sm:h-8 text-xs text-primary hover:bg-primary/5 rounded-lg px-2 sm:px-3">
+                دخول
+              </Button>
+            </Link>
+          )}
+        </div>
       </header>
 
       {/* ─── Desktop floating sidebar ─── */}

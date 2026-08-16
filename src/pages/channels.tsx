@@ -20,8 +20,6 @@ import {
   Smartphone,
   CheckCircle2,
   Users,
-  Flame,
-  Star,
   Layers
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +28,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { StudentSuggestDialog } from "@/components/student-suggest-dialog";
+import { usePersistentState } from "@/lib/api-client-react";
+import { DEFAULT_COMMUNITY_CHANNELS, type CommunityChannel } from "@/components/admin/channels-tab";
 import {
   Dialog,
   DialogContent,
@@ -38,75 +38,6 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-
-export interface CommunityChannel {
-  id: string;
-  name: string;
-  type: "discord" | "telegram" | "whatsapp" | "youtube" | "custom";
-  url: string;
-  category: string;
-  desc?: string;
-  badge?: string;
-  color?: string;
-  icon?: string;
-  memberCount?: string;
-  isPinned?: boolean;
-}
-
-const DEFAULT_CHANNELS: CommunityChannel[] = [
-  {
-    id: "chan_discord_official",
-    name: "خادم ديسكورد موهبة 3 الرسمي",
-    type: "discord",
-    url: "https://discord.com",
-    category: "خوادم ديسكورد",
-    desc: "المجتمع الصوتي والدراسي المباشر للدفعة، غرف مراجعة صامتة ونقاش جماعي للمسائل الصعبة",
-    badge: "رسمي",
-    color: "from-indigo-600 to-blue-700",
-    icon: "MessageSquare",
-    memberCount: "+450 موهوب",
-    isPinned: true,
-  },
-  {
-    id: "chan_telegram_qudrat",
-    name: "قناة تجميعات وتسريبات القدرات",
-    type: "telegram",
-    url: "https://t.me",
-    category: "قنوات تليجرام",
-    desc: "ملفات وتجميعات يومية محلولة، نماذج اختبارات حديثة وقوانين ذهبية لاختبارات قياس",
-    badge: "تجميعات",
-    color: "from-sky-500 to-blue-600",
-    icon: "Send",
-    memberCount: "+1,200 مشترك",
-    isPinned: true,
-  },
-  {
-    id: "chan_whatsapp_study",
-    name: "مجموعة واتساب الاستفسارات العاجلة",
-    type: "whatsapp",
-    url: "https://chat.whatsapp.com",
-    category: "مجموعات واتساب",
-    desc: "للتنبيهات اليومية السريعة، الواجبات والمهام المدرسية المباشرة بين الطلاب والمعلمين",
-    badge: "عاجل",
-    color: "from-emerald-600 to-teal-700",
-    icon: "PhoneCall",
-    memberCount: "+280 طالب",
-    isPinned: false,
-  },
-  {
-    id: "chan_youtube_lectures",
-    name: "قناة شروحات التحصيلي والموهبة",
-    type: "youtube",
-    url: "https://youtube.com",
-    category: "قنوات يوتيوب",
-    desc: "شروحات مرئية تفاعلية لمنهج ثالث ثانوي ومفاهيم الفيزياء والرياضيات المتقدمة والقدرات",
-    badge: "شروحات",
-    color: "from-rose-600 to-red-700",
-    icon: "Tv",
-    memberCount: "+3,400 متابع",
-    isPinned: false,
-  },
-];
 
 const COLOR_PRESETS = [
   { label: "أزرق / نيلي ديسكورد", value: "from-indigo-600 to-blue-700" },
@@ -120,8 +51,8 @@ const COLOR_PRESETS = [
 
 export default function ChannelsPage() {
   const { toast } = useToast();
-  const [channels, setChannels] = useState<CommunityChannel[]>(DEFAULT_CHANNELS);
-  const [loading, setLoading] = useState(true);
+  const isAdmin = typeof window !== "undefined" && localStorage.getItem("isAdmin") === "true";
+  const [channels, setChannels] = usePersistentState<CommunityChannel[]>("channels", DEFAULT_COMMUNITY_CHANNELS);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("الكل");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -145,7 +76,6 @@ export default function ChannelsPage() {
   const [isAppInstalled, setIsAppInstalled] = useState(false);
 
   useEffect(() => {
-    // Check if running as PWA
     if (window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone) {
       setIsAppInstalled(true);
     }
@@ -183,31 +113,6 @@ export default function ChannelsPage() {
     }
   };
 
-  // Fetch Channels from Cloud SQL
-  useEffect(() => {
-    fetchChannels();
-  }, []);
-
-  const fetchChannels = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/channels");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setChannels(data);
-        } else {
-          setChannels(DEFAULT_CHANNELS);
-        }
-      }
-    } catch (err) {
-      console.warn("Using local default channels:", err);
-      setChannels(DEFAULT_CHANNELS);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSaveChannel = async () => {
     if (!formName.trim() || !formUrl.trim()) {
       toast({ title: "تنبيه", description: "يرجى كتابة اسم القناة ورابط الانضمام", variant: "destructive" });
@@ -215,7 +120,7 @@ export default function ChannelsPage() {
     }
 
     const channelPayload: CommunityChannel = {
-      id: editingChannel ? editingChannel.id : `chan_${Date.now()}`,
+      id: editingChannel ? editingChannel.id : `chan_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       name: formName.trim(),
       type: formType,
       url: formUrl.trim(),
@@ -227,52 +132,43 @@ export default function ChannelsPage() {
       isPinned: formIsPinned,
     };
 
+    const currentList = Array.isArray(channels) ? channels : [];
+    if (editingChannel) {
+      setChannels(currentList.map((c) => (c.id === editingChannel.id ? channelPayload : c)));
+      toast({ title: "تم التعديل بنجاح ✏️", description: `تم تحديث وتنسيق قناة ${formName}` });
+    } else {
+      setChannels([channelPayload, ...currentList]);
+      toast({ title: "تمت إضافة القناة بنجاح 🚀", description: `أصبحت قناة ${formName} متاحة الآن للجميع` });
+    }
+
+    setIsDialogOpen(false);
+    resetForm();
+
     try {
       if (editingChannel) {
-        // Update
-        const res = await fetch(`/api/channels/${editingChannel.id}`, {
+        await fetch(`/api/channels/${editingChannel.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(channelPayload),
         });
-        if (!res.ok) throw new Error("فشل التعديل");
-        setChannels(prev => prev.map(c => c.id === editingChannel.id ? channelPayload : c));
-        toast({ title: "تم التعديل بنجاح", description: `تم تحديث وتنسيق قناة ${formName}` });
       } else {
-        // Create
-        const res = await fetch("/api/channels", {
+        await fetch("/api/channels", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(channelPayload),
         });
-        if (!res.ok) throw new Error("فشل الحفظ");
-        setChannels(prev => [channelPayload, ...prev]);
-        toast({ title: "تمت إضافة القناة بنجاح", description: `أصبحت قناة ${formName} متاحة الآن للجميع` });
       }
-      setIsDialogOpen(false);
-      resetForm();
-    } catch (err) {
-      // Fallback local update
-      if (editingChannel) {
-        setChannels(prev => prev.map(c => c.id === editingChannel.id ? channelPayload : c));
-      } else {
-        setChannels(prev => [channelPayload, ...prev]);
-      }
-      setIsDialogOpen(false);
-      resetForm();
-      toast({ title: "تم الحفظ محلياً", description: "تم حفظ التنسيق في القائمة الحالية" });
-    }
+    } catch {}
   };
 
   const handleDeleteChannel = async (id: string, name: string) => {
+    const currentList = Array.isArray(channels) ? channels : [];
+    setChannels(currentList.filter((c) => String(c.id) !== String(id)));
+    toast({ title: "تم الحذف", description: `تم حذف قناة ${name}` });
+
     try {
       await fetch(`/api/channels/${id}`, { method: "DELETE" });
-      setChannels(prev => prev.filter(c => String(c.id) !== String(id)));
-      toast({ title: "تم الحذف", description: `تم حذف قناة ${name}` });
-    } catch {
-      setChannels(prev => prev.filter(c => String(c.id) !== String(id)));
-      toast({ title: "تم الحذف محلياً", description: `تم حذف قناة ${name}` });
-    }
+    } catch {}
   };
 
   const openEditDialog = (channel: CommunityChannel) => {
@@ -324,10 +220,12 @@ export default function ChannelsPage() {
     }
   };
 
-  const categories = ["الكل", ...Array.from(new Set(channels.map(c => c.category)))];
+  const channelList = Array.isArray(channels) ? channels : [];
+  const categories = ["الكل", ...Array.from(new Set(channelList.map((c) => c.category)))];
 
-  const filteredChannels = channels.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  const filteredChannels = channelList.filter((c) => {
+    const matchesSearch =
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (c.desc && c.desc.toLowerCase().includes(searchQuery.toLowerCase())) ||
       c.category.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCat = selectedCategory === "الكل" || c.category === selectedCategory;
@@ -355,10 +253,10 @@ export default function ChannelsPage() {
           <Button
             onClick={() => setIsSuggestOpen(true)}
             variant="outline"
-            className="h-11 px-4 rounded-2xl font-bold gap-2 border-border/70 bg-card hover:bg-muted text-foreground"
+            className="h-11 px-4 rounded-2xl font-bold gap-2 border-border/70 bg-card hover:bg-muted text-foreground shadow-sm"
           >
             <Send className="h-4 w-4 text-primary" />
-            <span>اقتراح أو تصحيح 💡</span>
+            <span>اقتراح قناة جديدة 💡</span>
           </Button>
           <StudentSuggestDialog
             isOpen={isSuggestOpen}
@@ -366,167 +264,207 @@ export default function ChannelsPage() {
             defaultType="general"
             defaultCategory="قنوات وتواصل"
           />
+
+          {isAdmin && (
             <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button className="h-11 px-5 rounded-2xl font-bold gap-2 shadow-md bg-primary text-primary-foreground hover:bg-primary/90">
-                <Plus className="h-5 w-5" />
-                <span>إضافة / تنسيق قناة</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md sm:max-w-lg rounded-3xl border-border/80" dir="rtl">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  <span>{editingChannel ? "تعديل وتنسيق القناة" : "إضافة قناة ومجتمع جديد"}</span>
-                </DialogTitle>
-              </DialogHeader>
+              <DialogTrigger asChild>
+                <Button className="h-11 px-5 rounded-2xl font-bold gap-2 shadow-md bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Plus className="h-5 w-5" />
+                  <span>إضافة قناة (إدارة)</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md sm:max-w-lg rounded-3xl border-border/80" dir="rtl">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    <span>{editingChannel ? "تعديل وتنسيق القناة" : "إضافة قناة ومجتمع جديد"}</span>
+                  </DialogTitle>
+                </DialogHeader>
 
-              <div className="space-y-4 py-2">
-                <div>
-                  <label className="text-xs font-bold text-muted-foreground block mb-1.5">اسم القناة / المجتمع *</label>
-                  <Input
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    placeholder="مثال: خادم ديسكورد موهبة 3 - قدرات وتحصيلي"
-                    className="rounded-xl h-11"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-4 py-2">
                   <div>
-                    <label className="text-xs font-bold text-muted-foreground block mb-1.5">نوع المنصة</label>
+                    <label className="text-xs font-bold text-muted-foreground block mb-1.5">اسم القناة / المجتمع *</label>
+                    <Input
+                      value={formName}
+                      onChange={(e) => setFormName(e.target.value)}
+                      placeholder="مثال: خادم ديسكورد موهبة 3 - قدرات وتحصيلي"
+                      className="rounded-xl h-11"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-muted-foreground block mb-1.5">نوع المنصة</label>
+                      <select
+                        value={formType}
+                        onChange={(e) => {
+                          const t = e.target.value as CommunityChannel["type"];
+                          setFormType(t);
+                          if (t === "discord") {
+                            setFormCategory("خوادم ديسكورد");
+                            setFormColor("from-indigo-600 to-blue-700");
+                          } else if (t === "telegram") {
+                            setFormCategory("قنوات تليجرام");
+                            setFormColor("from-sky-500 to-blue-600");
+                          } else if (t === "whatsapp") {
+                            setFormCategory("مجموعات واتساب");
+                            setFormColor("from-emerald-600 to-teal-700");
+                          } else if (t === "youtube") {
+                            setFormCategory("قنوات يوتيوب");
+                            setFormColor("from-rose-600 to-red-700");
+                          }
+                        }}
+                        className="w-full h-11 rounded-xl bg-background border border-input px-3 text-sm font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                      >
+                        <option value="discord">ديسكورد (Discord)</option>
+                        <option value="telegram">تليجرام (Telegram)</option>
+                        <option value="whatsapp">واتساب (WhatsApp)</option>
+                        <option value="youtube">يوتيوب (YouTube)</option>
+                        <option value="custom">موقع / رابط خارجي</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-muted-foreground block mb-1.5">التصنيف</label>
+                      <Input
+                        value={formCategory}
+                        onChange={(e) => setFormCategory(e.target.value)}
+                        placeholder="مثال: قنوات القدرات"
+                        className="rounded-xl h-11"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-muted-foreground block mb-1.5">رابط الانضمام المباشر *</label>
+                    <Input
+                      value={formUrl}
+                      onChange={(e) => setFormUrl(e.target.value)}
+                      placeholder="https://discord.gg/... أو https://t.me/..."
+                      className="rounded-xl h-11 text-left font-mono text-xs"
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-muted-foreground block mb-1.5">الوصف التعريفي للقناة</label>
+                    <Textarea
+                      value={formDesc}
+                      onChange={(e) => setFormDesc(e.target.value)}
+                      placeholder="شرح موجز لمحتوى القناة والفائدة المرجوة منها..."
+                      className="rounded-xl resize-none h-20 text-sm"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-muted-foreground block mb-1.5">شارة مميزة (Badge)</label>
+                      <Input
+                        value={formBadge}
+                        onChange={(e) => setFormBadge(e.target.value)}
+                        placeholder="رسمي / تجميعات / شروحات"
+                        className="rounded-xl h-11 text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-muted-foreground block mb-1.5">عدد الأعضاء / الحالة</label>
+                      <Input
+                        value={formMemberCount}
+                        onChange={(e) => setFormMemberCount(e.target.value)}
+                        placeholder="+500 موهوب"
+                        className="rounded-xl h-11 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-muted-foreground block mb-1.5">نمط اللون</label>
                     <select
-                      value={formType}
-                      onChange={(e) => {
-                        const t = e.target.value as CommunityChannel["type"];
-                        setFormType(t);
-                        if (t === "discord") {
-                          setFormCategory("خوادم ديسكورد");
-                          setFormColor("from-indigo-600 to-blue-700");
-                        } else if (t === "telegram") {
-                          setFormCategory("قنوات تليجرام");
-                          setFormColor("from-sky-500 to-blue-600");
-                        } else if (t === "whatsapp") {
-                          setFormCategory("مجموعات واتساب");
-                          setFormColor("from-emerald-600 to-teal-700");
-                        } else if (t === "youtube") {
-                          setFormCategory("قنوات يوتيوب");
-                          setFormColor("from-rose-600 to-red-700");
-                        }
-                      }}
+                      value={formColor}
+                      onChange={(e) => setFormColor(e.target.value)}
                       className="w-full h-11 rounded-xl bg-background border border-input px-3 text-sm font-medium focus:ring-2 focus:ring-primary focus:outline-none"
                     >
-                      <option value="discord">ديسكورد (Discord)</option>
-                      <option value="telegram">تليجرام (Telegram)</option>
-                      <option value="whatsapp">واتساب (WhatsApp)</option>
-                      <option value="youtube">يوتيوب (YouTube)</option>
-                      <option value="custom">موقع / رابط خارجي</option>
+                      {COLOR_PRESETS.map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-muted-foreground block mb-1.5">التصنيف</label>
-                    <Input
-                      value={formCategory}
-                      onChange={(e) => setFormCategory(e.target.value)}
-                      placeholder="مثال: قنوات القدرات"
-                      className="rounded-xl h-11"
+                  <div className="flex items-center gap-2 pt-2">
+                    <input
+                      type="checkbox"
+                      id="isPinnedMobile"
+                      checked={formIsPinned}
+                      onChange={(e) => setFormIsPinned(e.target.checked)}
+                      className="h-4 w-4 rounded text-primary focus:ring-primary"
                     />
+                    <label htmlFor="isPinnedMobile" className="text-xs font-bold cursor-pointer text-foreground">
+                      تثبيت القناة في أعلى الصفحة 📌
+                    </label>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-bold text-muted-foreground block mb-1.5">رابط الانضمام المباشر *</label>
-                  <Input
-                    value={formUrl}
-                    onChange={(e) => setFormUrl(e.target.value)}
-                    placeholder="https://discord.gg/... أو https://t.me/..."
-                    className="rounded-xl h-11 text-left"
-                    dir="ltr"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-muted-foreground block mb-1.5">الوصف التعريفي للقناة</label>
-                  <Textarea
-                    value={formDesc}
-                    onChange={(e) => setFormDesc(e.target.value)}
-                    placeholder="أهداف القناة، ما تقدمه للطلاب، ومواعيد المراجعة..."
-                    rows={2}
-                    className="rounded-xl resize-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-muted-foreground block mb-1.5">شارة القناة (Badge)</label>
-                    <Input
-                      value={formBadge}
-                      onChange={(e) => setFormBadge(e.target.value)}
-                      placeholder="مثال: رسمي أو تجميعات"
-                      className="rounded-xl h-11"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-muted-foreground block mb-1.5">عدد الأعضاء / المشتركين</label>
-                    <Input
-                      value={formMemberCount}
-                      onChange={(e) => setFormMemberCount(e.target.value)}
-                      placeholder="+450 طالب"
-                      className="rounded-xl h-11"
-                    />
-                  </div>
-                </div>
-
-                {/* Color Preset Palette */}
-                <div>
-                  <label className="text-xs font-bold text-muted-foreground block mb-2">تنسيق لون التدرج (Theme Gradient)</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {COLOR_PRESETS.map((cp) => (
-                      <button
-                        key={cp.value}
-                        type="button"
-                        onClick={() => setFormColor(cp.value)}
-                        className={`flex items-center gap-2 p-2 rounded-xl border text-xs font-medium transition-all ${
-                          formColor === cp.value
-                            ? "border-primary ring-2 ring-primary/30 bg-primary/10 text-foreground"
-                            : "border-border/60 hover:border-border text-muted-foreground"
-                        }`}
-                      >
-                        <div className={`h-4 w-4 rounded-full bg-gradient-to-r ${cp.value} shrink-0 shadow-sm`} />
-                        <span className="truncate">{cp.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    type="checkbox"
-                    id="pinned_cb"
-                    checked={formIsPinned}
-                    onChange={(e) => setFormIsPinned(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <label htmlFor="pinned_cb" className="text-xs font-bold cursor-pointer select-none">
-                    تثبيت القناة بأعلى البوابة (قناة مميزة)
-                  </label>
-                </div>
-              </div>
-
-              <DialogFooter className="gap-2 sm:gap-0 pt-2">
-                <Button variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }} className="rounded-xl">
-                  إلغاء
-                </Button>
-                <Button onClick={handleSaveChannel} className="rounded-xl font-bold bg-primary text-primary-foreground">
-                  حفظ وتطبيق التنسيق
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter className="flex gap-2 pt-3 border-t border-border/50">
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-xl">
+                    إلغاء
+                  </Button>
+                  <Button onClick={handleSaveChannel} className="rounded-xl font-bold bg-primary text-primary-foreground">
+                    حفظ وتطبيق التنسيق
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
+
+      {/* ─── Android App Direct Banner ─── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-3xl p-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 text-white shadow-lg border border-emerald-400/30"
+      >
+        <div className="absolute top-0 right-0 -mr-8 -mt-8 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="flex flex-col md:flex-row items-center justify-between gap-5 relative z-10">
+          <div className="flex items-center gap-4 text-center md:text-right flex-col md:flex-row">
+            <div className="p-3.5 bg-white/15 backdrop-blur-md rounded-2xl border border-white/25 shadow-inner">
+              <Smartphone className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 justify-center md:justify-start mb-0.5">
+                <span className="px-2 py-0.5 rounded-full bg-white/20 text-[11px] font-bold tracking-wide">
+                  تطبيق الهاتف PWA
+                </span>
+                <span className="text-emerald-200 text-xs font-semibold">جاهز للتثبيت</span>
+              </div>
+              <h2 className="text-xl font-bold">تطبيق منصة ثالث ثانوي موهبة</h2>
+              <p className="text-xs text-emerald-100 max-w-xl mt-1 leading-relaxed">
+                ثبّت المنصة مباشرة على هاتفك أو جهازك لتصفح الجداول والواجبات والمكتبة بسرعة فائقة وبدون انقطاع.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            {isAppInstalled ? (
+              <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/20 backdrop-blur-md font-bold text-sm">
+                <CheckCircle2 className="h-5 w-5 text-emerald-300" />
+                <span>التطبيق مثبت لديك بالفعل</span>
+              </div>
+            ) : (
+              <Button
+                onClick={handleInstallClick}
+                className="h-12 px-6 rounded-2xl bg-white text-emerald-800 hover:bg-emerald-50 font-extrabold shadow-md gap-2"
+              >
+                <Download className="h-5 w-5" />
+                <span>تثبيت على الشاشة الرئيسية</span>
+              </Button>
+            )}
+          </div>
+        </div>
+      </motion.div>
 
       {/* ─── Search & Category Filters ─── */}
       <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -567,12 +505,11 @@ export default function ChannelsPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
               whileHover={{ y: -4 }}
-              whileTap={{ scale: 0.98 }}
               transition={{ delay: index * 0.05 }}
               className="group relative overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
             >
               {/* Top Gradient Header */}
-              <div className={`h-20 bg-muted/30 border-b border-border/50 p-5 relative overflow-hidden flex items-start justify-between transition-colors group-hover:bg-muted/50`}>
+              <div className="h-20 bg-muted/30 border-b border-border/50 p-5 relative overflow-hidden flex items-start justify-between transition-colors group-hover:bg-muted/50">
                 <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${channel.color || "from-indigo-500 to-blue-500"}`} />
                 <div className="relative z-10 flex items-center gap-3">
                   <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${channel.color || "from-indigo-500 to-blue-500"} text-white shadow-sm`}>
@@ -610,26 +547,28 @@ export default function ChannelsPage() {
                     <span>{channel.memberCount || "نشط 👥"}</span>
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEditDialog(channel)}
-                      className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
-                      title="تنسيق وتعديل القناة"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteChannel(channel.id, channel.name)}
-                      className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-destructive"
-                      title="حذف القناة"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                  {isAdmin && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEditDialog(channel)}
+                        className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+                        title="تنسيق وتعديل القناة"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteChannel(channel.id, channel.name)}
+                        className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-destructive"
+                        title="حذف القناة"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Direct Action Buttons */}
@@ -678,7 +617,7 @@ export default function ChannelsPage() {
         <div className="text-center py-16 bg-card/40 rounded-3xl border border-dashed border-border/80">
           <MessageSquare className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
           <h3 className="font-bold text-lg text-foreground">لا توجد قنوات تطابق بحثك</h3>
-          <p className="text-xs text-muted-foreground mt-1">جرّب تغيير عبارة البحث أو إضافة قناة جديدة للبوابة</p>
+          <p className="text-xs text-muted-foreground mt-1">جرّب تغيير عبارة البحث أو إرسال اقتراح قناة جديدة</p>
         </div>
       )}
     </div>

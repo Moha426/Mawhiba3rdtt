@@ -47,6 +47,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+import { usePersistentState } from "@/lib/api-client-react";
+
 type Mode = "solver" | "quiz_gen" | "planner" | "my_questions";
 
 interface GeneratedQuestion {
@@ -110,9 +112,18 @@ export default function AITutorPage() {
     }
   }, [profile?.displayName]);
 
-  // My Questions List
-  const [myQuestions, setMyQuestions] = useState<StudentEscalatedQ[]>([]);
+  // Escalated Questions List (Real-time Firestore Sync)
+  const [allEscalatedQuestions, setAllEscalatedQuestions] = usePersistentState<StudentEscalatedQ[]>("escalated_questions", []);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
+
+  // Filter questions for the current student
+  const myQuestions = allEscalatedQuestions.filter(
+    (q) =>
+      q.studentName === studentName ||
+      q.studentName === "طالب موهبة" ||
+      !q.studentName ||
+      (profile?.displayName && q.studentName === profile.displayName)
+  );
 
   // Quiz Generator State
   const [quizTopic, setQuizTopic] = useState("الهندسة وحساب المساحات (قدرات كمي)");
@@ -138,31 +149,21 @@ export default function AITutorPage() {
   } | null>(null);
 
   useEffect(() => {
-    fetchMyQuestions();
-    const interval = setInterval(() => {
-      fetchMyQuestions(false);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [studentName]);
-
-  const fetchMyQuestions = async (showLoading = true) => {
-    try {
-      if (showLoading) setLoadingQuestions(true);
-      const res = await fetch("/api/escalated-questions");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          // Filter questions for the current student
-          const filtered = data.filter((q: StudentEscalatedQ) => q.studentName === studentName);
-          setMyQuestions(filtered);
+    // Merge any remote questions if backend API available
+    fetch("/api/escalated-questions")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setAllEscalatedQuestions((prev) => {
+            const map = new Map<number, StudentEscalatedQ>();
+            prev.forEach((q) => map.set(q.id, q));
+            data.forEach((q: StudentEscalatedQ) => map.set(q.id, q));
+            return Array.from(map.values());
+          });
         }
-      }
-    } catch (err) {
-      console.warn("Could not fetch questions:", err);
-    } finally {
-      setLoadingQuestions(false);
-    }
-  };
+      })
+      .catch(() => {});
+  }, []);
 
   const handleImageFile = (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -324,44 +325,37 @@ export default function AITutorPage() {
     if (!problemInput.trim() && !solverResult && !uploadedImage) return;
     setEscalating(true);
 
-    const payload = {
-      studentName: studentName.trim() || "طالب موهبة",
+    const newQuestion: StudentEscalatedQ = {
+      id: Date.now(),
+      studentName: studentName.trim() || profile?.displayName || "طالب موهبة",
       studentGrade: "ثالث ثانوي - موهبة",
       subject: solverSubject,
       question: problemInput.trim() || "استفسار ومسألة من المعلم الذكي مع صورة مرفقة",
       imageUrl: uploadedImage || undefined,
       aiAnswer: solverResult?.answer ? `${solverResult.answer}\nالقانون: ${solverResult.rule}` : "تم استشارة المعلم الذكي",
       studentFeedback: escalateFeedback.trim() || "يحتاج الطالب توضيحاً إضافياً ومثالاً نموذجياً من المعلم",
+      status: "pending",
+      createdAt: new Date().toISOString(),
     };
 
+    setAllEscalatedQuestions((prev) => [newQuestion, ...prev]);
+
     try {
-      const res = await fetch("/api/escalated-questions", {
+      await fetch("/api/escalated-questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(newQuestion),
       });
+    } catch {}
 
-      if (res.ok) {
-        const savedQ = await res.json();
-        setMyQuestions(prev => [savedQ, ...prev]);
-      }
-
-      setHasBenefited(false);
-      setIsEscalateOpen(false);
-      setEscalateFeedback("");
-      toast({
-        title: "تم رفع السؤال للمعلم بنجاح",
-        description: "وصل سؤالك الآن إلى لوحة تحكم المعلمين وسيتم وضع توضيح مفصل في أقرب وقت.",
-      });
-    } catch (err) {
-      toast({
-        title: "تم تسجيل السؤال محلياً",
-        description: "سيتمكن المعلم من مراجعة سؤالك",
-      });
-      setIsEscalateOpen(false);
-    } finally {
-      setEscalating(false);
-    }
+    setHasBenefited(false);
+    setIsEscalateOpen(false);
+    setEscalateFeedback("");
+    toast({
+      title: "تم رفع السؤال للمعلم بنجاح",
+      description: "وصل سؤالك الآن إلى لوحة تحكم المعلمين وسيتم وضع توضيح مفصل في أقرب وقت.",
+    });
+    setEscalating(false);
   };
 
   // Handle Quiz Generator

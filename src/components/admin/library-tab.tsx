@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { CategoryManager } from "@/components/category-manager";
 import {
   getStudyFiles,
+  subscribeToStudyFiles,
   addStudyFile,
   updateStudyFile,
   deleteStudyFile,
@@ -46,15 +47,13 @@ export function LibraryTab() {
   const [selectedFileObj, setSelectedFileObj] = useState<File | null>(null);
 
   useEffect(() => {
-    loadFiles();
-  }, []);
-
-  const loadFiles = async () => {
     setLoading(true);
-    const data = await getStudyFiles();
-    setFiles(data);
-    setLoading(false);
-  };
+    const unsub = subscribeToStudyFiles((updated) => {
+      setFiles(updated);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
 
   const handleOpenAdd = () => {
     setEditingFile(null);

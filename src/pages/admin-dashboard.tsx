@@ -15,6 +15,7 @@ import { EventsTab } from "@/components/admin/events-tab";
 import { SettingsTab } from "@/components/admin/settings-tab";
 import { PlatformsTab } from "@/components/admin/platforms-tab";
 import { LibraryTab } from "@/components/admin/library-tab";
+import { ChannelsTab } from "@/components/admin/channels-tab";
 import { FlashcardsTab } from "@/components/admin/flashcards-tab";
 import { SuggestionsTab } from "@/components/admin/suggestions-tab";
 import { EscalatedQuestionsTab } from "@/components/admin/escalated-questions-tab";
@@ -218,6 +219,10 @@ export default function AdminDashboard() {
               <Globe className="h-3.5 w-3.5" />
               المنصات
             </TabsTrigger>
+            <TabsTrigger value="channels" className={triggerClass}>
+              <Layers className="h-3.5 w-3.5" />
+              القنوات والمجتمعات
+            </TabsTrigger>
             <TabsTrigger value="library" className={triggerClass}>
               <FileText className="h-3.5 w-3.5" />
               المكتبة والتجميعات
@@ -274,6 +279,9 @@ export default function AdminDashboard() {
         </TabsContent>
         <TabsContent value="platforms" className="m-0">
           <PlatformsTab />
+        </TabsContent>
+        <TabsContent value="channels" className="m-0">
+          <ChannelsTab />
         </TabsContent>
         <TabsContent value="library" className="m-0">
           <LibraryTab />

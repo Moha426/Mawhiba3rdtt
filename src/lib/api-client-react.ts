@@ -133,6 +133,12 @@ export function usePersistentState<T>(key: string, initialValue: T): [T, (val: T
         localStorage.setItem("talented_school_custom_platforms_v1", JSON.stringify(next));
         localStorage.setItem("custom_educational_platforms_v3", JSON.stringify(next));
         window.dispatchEvent(new CustomEvent("platforms_storage_change", { detail: { platforms: next } }));
+      } else if (key === "study_files") {
+        localStorage.setItem("talented_school_custom_files_v1", JSON.stringify(next));
+        localStorage.setItem("app_data_study_files", JSON.stringify(next));
+        window.dispatchEvent(new CustomEvent("app_file_updated", { detail: next }));
+      } else if (key === "channels") {
+        window.dispatchEvent(new CustomEvent("channels_storage_change", { detail: { channels: next } }));
       }
     } catch {}
     
@@ -154,9 +160,13 @@ export const SYNC_KEYS = [
   "notes",
   "students",
   "platforms",
+  "channels",
+  "study_files",
   "settings",
   "study_rooms",
   "flashcards",
+  "escalated_questions",
+  "student_suggestions",
 ];
 
 export async function pushAllLocalDataToCloud(): Promise<{ success: boolean; syncedKeys: string[]; count: number }> {

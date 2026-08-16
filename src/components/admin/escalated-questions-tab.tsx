@@ -69,10 +69,12 @@ const SEED_QUESTIONS: EscalatedQuestion[] = [
   },
 ];
 
+import { usePersistentState } from "@/lib/api-client-react";
+
 export function EscalatedQuestionsTab() {
   const { toast } = useToast();
-  const [questions, setQuestions] = useState<EscalatedQuestion[]>(SEED_QUESTIONS);
-  const [loading, setLoading] = useState(true);
+  const [questions, setQuestions] = usePersistentState<EscalatedQuestion[]>("escalated_questions", SEED_QUESTIONS);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
@@ -84,28 +86,21 @@ export function EscalatedQuestionsTab() {
   const [teacherNameInput, setTeacherNameInput] = useState("المعلم المشرف");
 
   useEffect(() => {
-    fetchEscalatedQuestions();
-  }, []);
-
-  const fetchEscalatedQuestions = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/escalated-questions");
-      if (res.ok) {
-        const data = await res.json();
+    // Optionally fetch from API to merge if backend DB exists
+    fetch("/api/escalated-questions")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
         if (Array.isArray(data) && data.length > 0) {
-          setQuestions(data);
-        } else {
-          setQuestions(SEED_QUESTIONS);
+          setQuestions(prev => {
+            const map = new Map<number, EscalatedQuestion>();
+            prev.forEach(q => map.set(q.id, q));
+            data.forEach((q: EscalatedQuestion) => map.set(q.id, q));
+            return Array.from(map.values());
+          });
         }
-      }
-    } catch (err) {
-      console.warn("Using local questions:", err);
-      setQuestions(SEED_QUESTIONS);
-    } finally {
-      setLoading(false);
-    }
-  };
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSendReply = async (id: number) => {
     if (!replyText.trim()) {
@@ -113,55 +108,56 @@ export function EscalatedQuestionsTab() {
       return;
     }
 
+    const reply = replyText.trim();
+    const teacherName = teacherNameInput.trim() || "المعلم المشرف";
+    const now = new Date().toISOString();
+
+    setQuestions((prev) =>
+      prev.map((q) =>
+        q.id === id
+          ? {
+              ...q,
+              status: "answered",
+              teacherReply: reply,
+              teacherName: teacherName,
+              updatedAt: now,
+            }
+          : q
+      )
+    );
+
     try {
-      const res = await fetch(`/api/escalated-questions/${id}/reply`, {
+      await fetch(`/api/escalated-questions/${id}/reply`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: "answered",
-          teacherReply: replyText.trim(),
-          teacherName: teacherNameInput.trim() || "المعلم المشرف",
+          teacherReply: reply,
+          teacherName: teacherName,
         }),
       });
+    } catch {}
 
-      setQuestions((prev) =>
-        prev.map((q) =>
-          q.id === id
-            ? {
-                ...q,
-                status: "answered",
-                teacherReply: replyText.trim(),
-                teacherName: teacherNameInput.trim() || "المعلم المشرف",
-                updatedAt: new Date().toISOString(),
-              }
-            : q
-        )
-      );
-
-      setReplyingId(null);
-      setReplyText("");
-      toast({ title: "تم إرسال رد المعلم بنجاح", description: "سيتمكن الطالب من رؤية توضيحك فوراً في حسابه" });
-    } catch (err) {
-      toast({ title: "تم حفظ الرد محلياً", description: "تم تحديث حالة السؤال إلى 'تم الرد'" });
-      setReplyingId(null);
-      setReplyText("");
-    }
+    setReplyingId(null);
+    setReplyText("");
+    toast({ title: "تم إرسال رد المعلم بنجاح", description: "سيتمكن الطالب من رؤية توضيحك فوراً في حسابه" });
   };
 
   const handleDelete = async (id: number) => {
+    setQuestions((prev) => prev.filter((q) => q.id !== id));
     try {
       await fetch(`/api/escalated-questions/${id}`, { method: "DELETE" });
-      setQuestions((prev) => prev.filter((q) => q.id !== id));
-      toast({ title: "تم الحذف بنجاح" });
-    } catch {
-      setQuestions((prev) => prev.filter((q) => q.id !== id));
-      toast({ title: "تم الحذف محلياً" });
-    }
+    } catch {}
+    toast({ title: "تم الحذف بنجاح" });
   };
 
   const handleToggleStatus = async (id: number, currentStatus: EscalatedQuestion["status"]) => {
     const nextStatus: EscalatedQuestion["status"] =
       currentStatus === "pending" ? "answered" : currentStatus === "answered" ? "resolved" : "pending";
+
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === id ? { ...q, status: nextStatus } : q))
+    );
 
     try {
       await fetch(`/api/escalated-questions/${id}/reply`, {
@@ -169,15 +165,8 @@ export function EscalatedQuestionsTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),
       });
-      setQuestions((prev) =>
-        prev.map((q) => (q.id === id ? { ...q, status: nextStatus } : q))
-      );
-      toast({ title: "تم تغيير الحالة بنجاح" });
-    } catch {
-      setQuestions((prev) =>
-        prev.map((q) => (q.id === id ? { ...q, status: nextStatus } : q))
-      );
-    }
+    } catch {}
+    toast({ title: "تم تغيير الحالة بنجاح" });
   };
 
   const pendingCount = questions.filter((q) => q.status === "pending").length;
