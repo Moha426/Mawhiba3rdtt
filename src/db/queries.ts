@@ -6,6 +6,7 @@ import {
   users,
   communityChannels,
   escalatedQuestions,
+  suggestions,
 } from "./schema";
 import { eq, desc, and, isNull } from "drizzle-orm";
 import fs from "fs";
@@ -21,6 +22,7 @@ interface LocalStore {
   flashcards: any[];
   communityChannels: any[];
   escalatedQuestions: any[];
+  suggestions: any[];
 }
 
 const STORE_FILE_PATH = path.join(process.cwd(), ".local_db_store.json");
@@ -264,6 +266,7 @@ let memoryStore: LocalStore = {
   flashcards: initialFlashcards,
   communityChannels: initialChannels,
   escalatedQuestions: initialEscalatedQuestions,
+  suggestions: [],
 };
 
 // Try loading persisted file store
@@ -279,6 +282,7 @@ try {
       studyFiles: loaded.studyFiles?.length > 0 ? loaded.studyFiles : initialFiles,
       flashcards: loaded.flashcards?.length > 0 ? loaded.flashcards : initialFlashcards,
       escalatedQuestions: loaded.escalatedQuestions?.length > 0 ? loaded.escalatedQuestions : initialEscalatedQuestions,
+      suggestions: loaded.suggestions?.length > 0 ? loaded.suggestions : [],
     };
   }
 } catch (e) {
@@ -946,6 +950,150 @@ export async function deleteEscalatedQuestion(id: number) {
   }
 
   memoryStore.escalatedQuestions = memoryStore.escalatedQuestions.filter((q) => q.id !== id);
+  persistStore();
+  return { success: true };
+}
+
+// ================= SUGGESTIONS QUERIES =================
+export async function getAllSuggestions() {
+  const dbInstance = getDb();
+  if (dbInstance) {
+    try {
+      return await dbInstance
+        .select()
+        .from(suggestions)
+        .orderBy(desc(suggestions.createdAt));
+    } catch (error) {
+      recordDbFailure(error);
+      console.warn("Cloud SQL suggestions fetch skipped, using local store:", error);
+    }
+  }
+
+  return [...memoryStore.suggestions].sort(
+    (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+  );
+}
+
+export async function insertSuggestion(data: any) {
+  const dbInstance = getDb();
+  if (dbInstance) {
+    try {
+      const cleanData = {
+        id: data.id,
+        type: data.type,
+        title: data.title,
+        category: data.category || "عام",
+        description: data.description || "",
+        data: typeof data.data === "object" ? JSON.stringify(data.data) : (data.data || null),
+        studentId: typeof data.studentId === "number" ? data.studentId : parseInt(data.studentId, 10) || null,
+        studentName: data.studentName,
+        studentUsername: data.studentUsername || null,
+        status: data.status || "pending",
+      };
+
+      const existing = await dbInstance.select().from(suggestions).where(eq(suggestions.id, data.id));
+      if (existing.length > 0) {
+        const updated = await dbInstance
+          .update(suggestions)
+          .set({ ...cleanData, updatedAt: new Date() })
+          .where(eq(suggestions.id, data.id))
+          .returning();
+        return updated[0];
+      } else {
+        const inserted = await dbInstance
+          .insert(suggestions)
+          .values({
+            ...cleanData,
+            createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+            updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
+          })
+          .returning();
+        return inserted[0];
+      }
+    } catch (error) {
+      recordDbFailure(error);
+      console.warn("Cloud SQL suggestion insert skipped, using local store:", error);
+    }
+  }
+
+  const existingIndex = memoryStore.suggestions.findIndex((s) => s.id === data.id);
+  const cleanItem = {
+    id: data.id,
+    type: data.type,
+    title: data.title,
+    category: data.category || "عام",
+    description: data.description || "",
+    data: typeof data.data === "object" ? JSON.stringify(data.data) : (data.data || null),
+    studentId: typeof data.studentId === "number" ? data.studentId : parseInt(data.studentId, 10) || null,
+    studentName: data.studentName,
+    studentUsername: data.studentUsername || null,
+    status: data.status || "pending",
+    createdAt: data.createdAt || new Date().toISOString(),
+    updatedAt: data.updatedAt || new Date().toISOString(),
+  };
+
+  if (existingIndex >= 0) {
+    memoryStore.suggestions[existingIndex] = cleanItem;
+  } else {
+    memoryStore.suggestions.unshift(cleanItem);
+  }
+  persistStore();
+  return cleanItem;
+}
+
+export async function updateSuggestion(id: string, updateData: any) {
+  const dbInstance = getDb();
+  if (dbInstance) {
+    try {
+      const cleanUpdate: any = {};
+      if (updateData.type !== undefined) cleanUpdate.type = updateData.type;
+      if (updateData.title !== undefined) cleanUpdate.title = updateData.title;
+      if (updateData.category !== undefined) cleanUpdate.category = updateData.category;
+      if (updateData.description !== undefined) cleanUpdate.description = updateData.description;
+      if (updateData.data !== undefined) {
+        cleanUpdate.data = typeof updateData.data === "object" ? JSON.stringify(updateData.data) : updateData.data;
+      }
+      if (updateData.studentId !== undefined) {
+        cleanUpdate.studentId = typeof updateData.studentId === "number" ? updateData.studentId : parseInt(updateData.studentId, 10) || null;
+      }
+      if (updateData.studentName !== undefined) cleanUpdate.studentName = updateData.studentName;
+      if (updateData.studentUsername !== undefined) cleanUpdate.studentUsername = updateData.studentUsername;
+      if (updateData.status !== undefined) cleanUpdate.status = updateData.status;
+      cleanUpdate.updatedAt = new Date();
+
+      const updated = await dbInstance
+        .update(suggestions)
+        .set(cleanUpdate)
+        .where(eq(suggestions.id, id))
+        .returning();
+      return updated[0];
+    } catch (error) {
+      recordDbFailure(error);
+      console.warn("Cloud SQL suggestion update skipped, using local store:", error);
+    }
+  }
+
+  const item = memoryStore.suggestions.find((s) => s.id === id);
+  if (item) {
+    Object.assign(item, updateData);
+    item.updatedAt = new Date().toISOString();
+    persistStore();
+  }
+  return item;
+}
+
+export async function deleteSuggestion(id: string) {
+  const dbInstance = getDb();
+  if (dbInstance) {
+    try {
+      return await dbInstance.delete(suggestions).where(eq(suggestions.id, id)).returning();
+    } catch (error) {
+      recordDbFailure(error);
+      console.warn("Cloud SQL suggestion delete skipped, using local store:", error);
+    }
+  }
+
+  memoryStore.suggestions = memoryStore.suggestions.filter((s) => s.id !== id);
   persistStore();
   return { success: true };
 }

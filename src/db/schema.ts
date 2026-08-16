@@ -122,3 +122,20 @@ export const chatMessages = pgTable("chat_messages", {
   createdAt: timestamp("created_at").defaultNow(),
   deletedAt: timestamp("deleted_at"),
 });
+
+// Suggestions Table (Student Suggestions)
+export const suggestions = pgTable("suggestions", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  category: text("category").default("عام"),
+  description: text("description").default(""),
+  data: text("data"), // Stored as JSON string
+  studentId: integer("student_id"),
+  studentName: text("student_name"),
+  studentUsername: text("student_username"),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+

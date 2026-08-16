@@ -25,6 +25,10 @@ import {
   insertEscalatedQuestion,
   updateEscalatedQuestionReply,
   deleteEscalatedQuestion,
+  getAllSuggestions,
+  insertSuggestion,
+  updateSuggestion,
+  deleteSuggestion,
 } from "./src/db/queries";
 import { 
   solveProblemWithGemini, 
@@ -463,90 +467,50 @@ async function startServer() {
     res.json({ success: true, user: student });
   });
 
-  // Suggestions Management (Student Suggestions & Escalated Questions)
-  const memorySuggestions = new Map<string, any>();
-
+  // Suggestions Management (Student Suggestions) using database/fallback
   app.get("/api/suggestions", async (_req, res) => {
     try {
-      if (firestoreDb) {
-        const snapshot = await firestoreDb.collection("suggestions").orderBy("createdAt", "desc").get();
-        const list: any[] = [];
-        snapshot.forEach((doc) => {
-          list.push({ id: doc.id, ...doc.data() });
-        });
-        return res.json(list);
-      }
-    } catch (err) {
-      console.warn("Server Firestore suggestions read error, falling back to memory:", err);
+      const list = await getAllSuggestions();
+      res.json(list);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to fetch suggestions" });
     }
-
-    const list = Array.from(memorySuggestions.values()).sort(
-      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-    );
-    res.json(list);
   });
 
   app.post("/api/suggestions", async (req, res) => {
-    const items = Array.isArray(req.body) ? req.body : [req.body];
-    
     try {
-      if (firestoreDb) {
-        const batch = firestoreDb.batch();
-        items.forEach((item) => {
-          if (item && item.id) {
-            const docRef = firestoreDb.collection("suggestions").doc(item.id);
-            // Clean undefined values to prevent Firestore write errors
-            const cleanItem = JSON.parse(JSON.stringify(item));
-            batch.set(docRef, cleanItem, { merge: true });
-            memorySuggestions.set(item.id, item);
-          }
-        });
-        await batch.commit();
-        return res.json({ success: true, count: items.length });
+      const items = Array.isArray(req.body) ? req.body : [req.body];
+      const results = [];
+      for (const item of items) {
+        if (item && item.id) {
+          const inserted = await insertSuggestion(item);
+          results.push(inserted);
+        }
       }
-    } catch (err) {
-      console.warn("Server Firestore suggestions write error, falling back to memory:", err);
+      res.json({ success: true, count: results.length, data: results });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to save suggestions" });
     }
-
-    items.forEach((item) => {
-      if (item && item.id) {
-        memorySuggestions.set(item.id, item);
-      }
-    });
-    res.json({ success: true, count: memorySuggestions.size });
   });
 
   app.put("/api/suggestions/:id", async (req, res) => {
-    const id = req.params.id;
-    const existing = memorySuggestions.get(id) || {};
-    const updated = { ...existing, ...req.body, id };
-    memorySuggestions.set(id, updated);
-
     try {
-      if (firestoreDb) {
-        const cleanUpdated = JSON.parse(JSON.stringify(updated));
-        await firestoreDb.collection("suggestions").doc(id).set(cleanUpdated, { merge: true });
-      }
-    } catch (err) {
-      console.warn("Server Firestore suggestions update error:", err);
+      const id = req.params.id;
+      const updated = await updateSuggestion(id, req.body);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to update suggestion" });
     }
-
-    res.json(updated);
   });
 
   app.delete("/api/suggestions/:id", async (req, res) => {
-    const id = req.params.id;
-    memorySuggestions.delete(id);
-
     try {
-      if (firestoreDb) {
-        await firestoreDb.collection("suggestions").doc(id).delete();
-      }
-    } catch (err) {
-      console.warn("Server Firestore suggestions delete error:", err);
+      const id = req.params.id;
+      await deleteSuggestion(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to delete suggestion" });
     }
-
-    res.json({ success: true });
   });
 
   // Direct APK Download Endpoint
