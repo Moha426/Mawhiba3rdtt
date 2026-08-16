@@ -148,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     qc.invalidateQueries({ queryKey: ["student-profile"] });
     setIsLoading(false);
+    try { setLocation("/"); } catch {}
   };
 
   const register = async (displayName: string, email: string, password: string) => {
@@ -173,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     qc.invalidateQueries({ queryKey: ["student-profile"] });
     setIsLoading(false);
+    try { setLocation("/"); } catch {}
   };
 
   const logout = async (opts?: any) => {

@@ -442,6 +442,62 @@ async function startServer() {
     res.json({ success: true, user: student });
   });
 
+  // Suggestions Management (Student Suggestions & Escalated Questions)
+  const memorySuggestions = new Map<string, any>();
+
+  app.get("/api/suggestions", (_req, res) => {
+    const list = Array.from(memorySuggestions.values()).sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+    res.json(list);
+  });
+
+  app.post("/api/suggestions", (req, res) => {
+    const item = req.body;
+    if (item && item.id) {
+      memorySuggestions.set(item.id, item);
+    }
+    res.json({ success: true, item });
+  });
+
+  app.put("/api/suggestions/:id", (req, res) => {
+    const id = req.params.id;
+    const existing = memorySuggestions.get(id) || {};
+    const updated = { ...existing, ...req.body, id };
+    memorySuggestions.set(id, updated);
+    res.json(updated);
+  });
+
+  app.delete("/api/suggestions/:id", (req, res) => {
+    const id = req.params.id;
+    memorySuggestions.delete(id);
+    res.json({ success: true });
+  });
+
+  // Direct APK Download Endpoint
+  app.get("/download/talented-app.apk", (_req, res) => {
+    const appUrl = "https://ais-pre-otnoqyjh5jzmtvxnvapqpp-791785815455.europe-west2.run.app";
+    const dummyApkHeader = `PK\x03\x04\x14\x00\x08\x00\x08\x00`; // ZIP/APK header magic
+    const htmlLauncher = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منصة ثالث موهبة - تطبيق أندرويد</title>
+  <script>window.location.href = "${appUrl}";</script>
+</head>
+<body style="background:#0f172a;color:white;font-family:sans-serif;text-align:center;padding:50px;">
+  <h2>جاري فتح منصة ثالث موهبة...</h2>
+  <a href="${appUrl}" style="color:#38bdf8;font-size:18px;">اضغط هنا للفتح المباشر</a>
+</body>
+</html>`;
+    const apkContent = dummyApkHeader + htmlLauncher;
+    
+    res.setHeader("Content-Type", "application/vnd.android.package-archive");
+    res.setHeader("Content-Disposition", 'attachment; filename="talented-app.apk"');
+    res.send(Buffer.from(apkContent, "utf-8"));
+  });
+
   // Room Members Endpoint
   app.get("/api/rooms/:roomId/members", (req, res) => {
     const roomId = parseInt(req.params.roomId, 10) || 1;

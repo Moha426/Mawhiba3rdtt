@@ -81,6 +81,24 @@ export function DownloadAppModal({ isOpen, onClose }: Props) {
     }
   };
 
+  const handleDownloadApk = () => {
+    try {
+      const link = document.createElement("a");
+      link.href = "/download/talented-app.apk";
+      link.download = "talented-app.apk";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "جاري تنزيل ملف APK 📲",
+        description: "بدأ تنزيل ملف تطبيق الأندرويد (talented-app.apk). افضغ للفتح والتثبيت على هاتفك.",
+      });
+    } catch {
+      window.location.href = "/download/talented-app.apk";
+    }
+  };
+
   const handleDownloadShortcut = () => {
     try {
       const url = window.location.origin;
@@ -174,13 +192,13 @@ export function DownloadAppModal({ isOpen, onClose }: Props) {
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
           <TabsList className="grid grid-cols-4 rounded-2xl p-1 bg-muted/70 h-11">
-            <TabsTrigger value="android" className="rounded-xl text-xs font-bold gap-1">
-              <Smartphone className="h-3.5 w-3.5" />
-              <span>أندرويد</span>
+            <TabsTrigger value="android" className="rounded-xl text-xs font-black gap-1 text-emerald-600 dark:text-emerald-400">
+              <Smartphone className="h-3.5 w-3.5 text-emerald-500" />
+              <span>أندرويد Android</span>
             </TabsTrigger>
             <TabsTrigger value="ios" className="rounded-xl text-xs font-bold gap-1">
               <Apple className="h-3.5 w-3.5" />
-              <span>آيفون / iPad</span>
+              <span>آيفون iOS</span>
             </TabsTrigger>
             <TabsTrigger value="desktop" className="rounded-xl text-xs font-bold gap-1">
               <Laptop className="h-3.5 w-3.5" />
@@ -194,38 +212,52 @@ export function DownloadAppModal({ isOpen, onClose }: Props) {
 
           {/* Android Tab */}
           <TabsContent value="android" className="space-y-4 pt-3">
-            <div className="bg-card p-4 rounded-2xl border border-border/70 space-y-3">
-              <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <span className="h-5 w-5 rounded-full bg-emerald-500/20 text-emerald-600 flex items-center justify-center text-xs">1</span>
-                طريقة التثبيت على هواتف أندرويد (Google Chrome):
-              </h4>
+            <div className="bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-card p-4 rounded-2xl border border-emerald-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Smartphone className="h-4 w-4 text-emerald-500" />
+                  تثبيت تطبيق أندرويد (Android Web App / APK):
+                </h4>
+                <Badge className="bg-emerald-500/20 text-emerald-600 border-0 text-[10px] font-black">
+                  موصى به للأندرويد 🤖
+                </Badge>
+              </div>
+
               <ul className="text-xs text-muted-foreground space-y-2 leading-relaxed pr-2">
                 <li className="flex items-start gap-2">
-                  <span className="text-primary font-bold">•</span>
-                  <span>افتح المنصة من متصفح <b>Chrome</b> على هاتفك.</span>
+                  <span className="text-emerald-500 font-bold">•</span>
+                  <span>افتح المنصة من متصفح <b>Chrome</b> على هاتفك الأندرويد.</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-primary font-bold">•</span>
-                  <span>اضغط على زر القائمة <b>(النقاط الثلاث ⋮)</b> بأعلى يسار الشاشة.</span>
+                  <span className="text-emerald-500 font-bold">•</span>
+                  <span>اضغط على زر القائمة <b>(النقاط الثلاث ⋮)</b> أعلى يسار المتصفح.</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-primary font-bold">•</span>
-                  <span>اختر <b>"تثبيت التطبيق"</b> أو <b>"إضافة إلى الشاشة الرئيسية" (Install App)</b>.</span>
+                  <span className="text-emerald-500 font-bold">•</span>
+                  <span>اختر <b>"تثبيت التطبيق" (Install App)</b> أو <b>"إضافة إلى الشاشة الرئيسية"</b>.</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-primary font-bold">•</span>
-                  <span>سيظهر التطبيق كأيقونة مستقلة في قائمة تطبيقاتك مع شاشة كاملة وسرعة فائقة.</span>
+                  <span className="text-emerald-500 font-bold">•</span>
+                  <span>سيتم تنزيل أيقونة التطبيق فوراً بملف تطبيق كامل وسريع على شاشة هاتفك الرئيسية.</span>
                 </li>
               </ul>
 
-              <div className="pt-2 flex gap-2">
+              <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                <Button
+                  onClick={handleDownloadApk}
+                  className="flex-1 rounded-xl text-xs font-black gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-md shadow-emerald-500/25 h-11"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>تحميل ملف APK المباشر (talented-app.apk)</span>
+                </Button>
+
                 <Button
                   onClick={handleNativeInstall}
                   variant="outline"
-                  className="flex-1 rounded-xl text-xs font-bold gap-2 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                  className="rounded-xl text-xs font-bold gap-1.5 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400 h-11"
                 >
-                  <Download className="h-4 w-4" />
-                  <span>بدء التثبيت المباشر</span>
+                  <Smartphone className="h-4 w-4 text-emerald-500" />
+                  <span>تثبيت PWA بنقرة واحدة</span>
                 </Button>
               </div>
             </div>

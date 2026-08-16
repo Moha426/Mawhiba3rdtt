@@ -8,6 +8,7 @@ export function SignInForm() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const { login, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,6 +19,12 @@ export function SignInForm() {
       isEmail ? identifier : undefined,
       password || "123456"
     );
+    setLocation("/");
+    setTimeout(() => {
+      if (window.location.pathname.includes("sign-in")) {
+        window.location.href = "/";
+      }
+    }, 100);
   };
 
   return (

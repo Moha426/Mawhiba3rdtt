@@ -95,6 +95,15 @@ export async function submitStudentSuggestion(params: {
   const current = getLocalSuggestions();
   saveLocalSuggestions([newSuggestion, ...current]);
 
+  // Sync to backend API
+  try {
+    await fetch("/api/suggestions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newSuggestion),
+    });
+  } catch {}
+
   // Sync to Firestore
   safeFirestoreWrite(async () => {
     const docRef = doc(db, "suggestions", newSuggestion.id);
@@ -123,9 +132,33 @@ export function subscribeToSuggestions(onUpdate: (suggestions: StudentSuggestion
   };
   window.addEventListener("student_suggestions_change", handleLocal);
 
+  // Poll backend API every 3 seconds for guaranteed multi-client cross-browser sync
+  const fetchFromApi = async () => {
+    try {
+      const res = await fetch("/api/suggestions");
+      if (res.ok) {
+        const apiList: StudentSuggestion[] = await res.json();
+        if (Array.isArray(apiList) && apiList.length > 0) {
+          const map = new Map<string, StudentSuggestion>();
+          getLocalSuggestions().forEach(s => map.set(s.id, s));
+          apiList.forEach(s => map.set(s.id, s));
+          const merged = Array.from(map.values()).sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          saveLocalSuggestions(merged);
+          onUpdate(merged);
+        }
+      }
+    } catch {}
+  };
+
+  fetchFromApi();
+  const pollInterval = setInterval(fetchFromApi, 3000);
+
+  let unsubFirestore = () => {};
   try {
     const q = query(collection(db, "suggestions"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snapshot) => {
+    unsubFirestore = onSnapshot(q, (snapshot) => {
       const cloudList: StudentSuggestion[] = [];
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
@@ -161,16 +194,13 @@ export function subscribeToSuggestions(onUpdate: (suggestions: StudentSuggestion
     }, (err) => {
       console.warn("Suggestions realtime error:", err);
     });
+  } catch {}
 
-    return () => {
-      window.removeEventListener("student_suggestions_change", handleLocal);
-      unsub();
-    };
-  } catch {
-    return () => {
-      window.removeEventListener("student_suggestions_change", handleLocal);
-    };
-  }
+  return () => {
+    window.removeEventListener("student_suggestions_change", handleLocal);
+    clearInterval(pollInterval);
+    unsubFirestore();
+  };
 }
 
 /**
@@ -255,9 +285,17 @@ export async function approveStudentSuggestion(
     console.error("Error publishing approved suggestion:", e);
   }
 
-  // 2. Update suggestion status in storage & Firestore
+  // 2. Update suggestion status in storage & Firestore & API
   const list = getLocalSuggestions().map(s => s.id === suggestion.id ? updated : s);
   saveLocalSuggestions(list);
+
+  try {
+    await fetch(`/api/suggestions/${suggestion.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated),
+    });
+  } catch {}
 
   safeFirestoreWrite(async () => {
     const docRef = doc(db, "suggestions", suggestion.id);
@@ -274,20 +312,32 @@ export async function rejectStudentSuggestion(
   adminName: string = "المشرف"
 ): Promise<void> {
   const current = getLocalSuggestions();
+  let updatedRecord: StudentSuggestion | null = null;
   const updated = current.map(s => {
     if (s.id === id) {
-      return {
+      updatedRecord = {
         ...s,
         status: "rejected" as const,
         adminFeedback: feedback || "تمت المراجعة والاعتذار عن النشر حالياً",
         reviewedBy: adminName,
         updatedAt: new Date().toISOString(),
       };
+      return updatedRecord;
     }
     return s;
   });
 
   saveLocalSuggestions(updated);
+
+  if (updatedRecord) {
+    try {
+      await fetch(`/api/suggestions/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedRecord),
+      });
+    } catch {}
+  }
 
   safeFirestoreWrite(async () => {
     const docRef = doc(db, "suggestions", id);
@@ -307,6 +357,10 @@ export async function rejectStudentSuggestion(
 export async function deleteStudentSuggestion(id: string): Promise<void> {
   const current = getLocalSuggestions().filter(s => s.id !== id);
   saveLocalSuggestions(current);
+
+  try {
+    await fetch(`/api/suggestions/${id}`, { method: "DELETE" });
+  } catch {}
 
   safeFirestoreWrite(async () => {
     const docRef = doc(db, "suggestions", id);

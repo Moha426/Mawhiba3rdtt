@@ -36,6 +36,7 @@ import {
   Check,
   Download,
   Smartphone,
+  PlusCircle,
 } from "lucide-react";
 import { AppLogo } from "@/components/app-logo";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { DownloadAppModal } from "@/components/download-app-modal";
+import { StudentSuggestDialog } from "@/components/student-suggest-dialog";
 
 interface LayoutProps {
   children: ReactNode;
@@ -463,10 +465,12 @@ export function Layout({ children }: LayoutProps) {
   );
 
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [suggestDialogOpen, setSuggestDialogOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
       <DownloadAppModal isOpen={downloadModalOpen} onClose={() => setDownloadModalOpen(false)} />
+      <StudentSuggestDialog isOpen={suggestDialogOpen} onClose={() => setSuggestDialogOpen(false)} />
 
       {/* ─── Mobile top header ─── */}
       <header
@@ -501,13 +505,26 @@ export function Layout({ children }: LayoutProps) {
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <Button
             variant="ghost"
-            size="icon"
-            onClick={() => setDownloadModalOpen(true)}
-            title="تنزيل وتثبيت التطبيق"
-            className="h-7 w-7 rounded-full text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 p-0"
+            size="sm"
+            onClick={() => setSuggestDialogOpen(true)}
+            title="إضافة اقتراح أو ملف جديد"
+            className="h-7 sm:h-8 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 rounded-xl px-2 gap-1"
           >
-            <Smartphone className="h-3.5 w-3.5" />
+            <PlusCircle className="h-3.5 w-3.5 text-amber-500" />
+            <span className="hidden xs:inline">إضافة</span>
           </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setDownloadModalOpen(true)}
+            title="تنزيل وتثبيت تطبيق أندرويد وآيفون"
+            className="h-7 sm:h-8 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 rounded-xl px-2 gap-1"
+          >
+            <Smartphone className="h-3.5 w-3.5 text-emerald-500" />
+            <span className="hidden xs:inline">تثبيت أندرويد</span>
+          </Button>
+
           {studentProfile && <NotificationBell />}
           <ColorThemePicker popupDirection="down" />
           <ThemeButton />
@@ -532,7 +549,7 @@ export function Layout({ children }: LayoutProps) {
             </Link>
           ) : (
             <Link href="/sign-in">
-              <Button variant="ghost" size="sm" className="h-7 sm:h-8 text-xs text-primary hover:bg-primary/5 rounded-lg px-2 sm:px-3">
+              <Button variant="ghost" size="sm" className="h-7 sm:h-8 text-xs font-bold text-primary hover:bg-primary/5 rounded-xl px-2.5">
                 دخول
               </Button>
             </Link>
@@ -611,7 +628,11 @@ export function Layout({ children }: LayoutProps) {
       </aside>
 
       {/* ─── Mobile floating bottom nav ─── */}
-      <MobileBottomNav location={location} onOpenDownload={() => setDownloadModalOpen(true)} />
+      <MobileBottomNav 
+        location={location} 
+        onOpenDownload={() => setDownloadModalOpen(true)}
+        onOpenSuggest={() => setSuggestDialogOpen(true)}
+      />
 
       {/* ─── Animated background orbs (CPU-light, CSS animation only) ─── */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
@@ -662,7 +683,15 @@ export function Layout({ children }: LayoutProps) {
 }
 
 /* ─── Mobile floating bottom navigation ─── */
-function MobileBottomNav({ location, onOpenDownload }: { location: string; onOpenDownload: () => void }) {
+function MobileBottomNav({ 
+  location, 
+  onOpenDownload,
+  onOpenSuggest,
+}: { 
+  location: string; 
+  onOpenDownload: () => void;
+  onOpenSuggest: () => void;
+}) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const isAdmin = localStorage.getItem("isAdmin") === "true";
@@ -678,6 +707,7 @@ function MobileBottomNav({ location, onOpenDownload }: { location: string; onOpe
   ];
 
   const moreNavItems = [
+    { href: "/sign-in", label: "حساب الطالب / الدخول", icon: UserCircle, desc: "تسجيل الدخول أو إنشاء حساب" },
     { href: "/channels", label: "بوابة القنوات", icon: MessageSquare, desc: "خوادم ديسكورد وقنوات تليجرام" },
     { href: "/flashcards", label: "بطاقات الإنجليزية", icon: Languages, desc: "كلمات ومصطلحات STEP & IELTS" },
     { href: "/quizzes", label: "الاختبارات والتحديات", icon: Trophy, desc: "تجميعات ونماذج محاكاة" },
@@ -870,8 +900,27 @@ function MobileBottomNav({ location, onOpenDownload }: { location: string; onOpe
                 })}
               </div>
 
-              {/* Install App Quick Action in Drawer */}
-              <div className="px-5 pb-2">
+              {/* Quick Suggest & Install Actions in Drawer */}
+              <div className="px-5 pb-2 space-y-2">
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    onOpenSuggest();
+                  }}
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/10 hover:from-amber-500/25 hover:to-orange-500/20 border border-amber-500/30 text-amber-700 dark:text-amber-300 transition-all text-right group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/30 shrink-0 group-hover:scale-105 transition-transform">
+                      <PlusCircle className="h-5 w-5" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-foreground">إضافة ملف، رابط أو اقتراح جديد</span>
+                      <span className="text-[10.5px] text-muted-foreground">شارك ملفاتك واقتراحاتك لتظهر للجميع</span>
+                    </div>
+                  </div>
+                  <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
+                </button>
+
                 <button
                   onClick={() => {
                     setShowMoreMenu(false);

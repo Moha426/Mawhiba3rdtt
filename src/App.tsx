@@ -289,14 +289,19 @@ function SignUpPage() {
 function AppRouter() {
   const [location] = useLocation();
 
-  const isAuthPage = location.startsWith("/sign-in") || location.startsWith("/sign-up");
+  const isAuthPage = location.startsWith("/sign-in") || location.startsWith("/sign-up") || location.startsWith("/login") || location.startsWith("/student-login");
   const isEmbed = window.location.search.includes("embed=true");
 
   if (isAuthPage) {
     return (
       <Switch>
-        <Route path="/sign-in/*?"><SignInPage /></Route>
-        <Route path="/sign-up/*?"><SignUpPage /></Route>
+        <Route path="/sign-in"><SignInPage /></Route>
+        <Route path="/sign-up"><SignUpPage /></Route>
+        <Route path="/login"><SignInPage /></Route>
+        <Route path="/student-login"><SignInPage /></Route>
+        <Route path="/sign-in/:rest*"><SignInPage /></Route>
+        <Route path="/sign-up/:rest*"><SignUpPage /></Route>
+        <Route><SignInPage /></Route>
       </Switch>
     );
   }

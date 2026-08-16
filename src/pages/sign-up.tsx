@@ -9,6 +9,7 @@ export function SignUpForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const { register, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,6 +17,12 @@ export function SignUpForm() {
     const cleanEmail = email.trim() || `${displayName.replace(/\s+/g, "_")}@student.talented.app`;
     const cleanPass = password.trim() || "123456";
     await register(displayName, cleanEmail, cleanPass);
+    setLocation("/");
+    setTimeout(() => {
+      if (window.location.pathname.includes("sign-up")) {
+        window.location.href = "/";
+      }
+    }, 100);
   };
 
   return (
