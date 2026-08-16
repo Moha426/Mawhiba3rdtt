@@ -989,6 +989,8 @@ export async function insertSuggestion(data: any) {
         studentName: data.studentName,
         studentUsername: data.studentUsername || null,
         status: data.status || "pending",
+        adminReply: data.adminReply || null,
+        adminRepliedAt: data.adminRepliedAt ? new Date(data.adminRepliedAt) : null,
       };
 
       const existing = await dbInstance.select().from(suggestions).where(eq(suggestions.id, data.id));
@@ -1028,6 +1030,8 @@ export async function insertSuggestion(data: any) {
     studentName: data.studentName,
     studentUsername: data.studentUsername || null,
     status: data.status || "pending",
+    adminReply: data.adminReply || null,
+    adminRepliedAt: data.adminRepliedAt || null,
     createdAt: data.createdAt || new Date().toISOString(),
     updatedAt: data.updatedAt || new Date().toISOString(),
   };
@@ -1059,6 +1063,10 @@ export async function updateSuggestion(id: string, updateData: any) {
       if (updateData.studentName !== undefined) cleanUpdate.studentName = updateData.studentName;
       if (updateData.studentUsername !== undefined) cleanUpdate.studentUsername = updateData.studentUsername;
       if (updateData.status !== undefined) cleanUpdate.status = updateData.status;
+      if (updateData.adminReply !== undefined) cleanUpdate.adminReply = updateData.adminReply;
+      if (updateData.adminRepliedAt !== undefined) {
+        cleanUpdate.adminRepliedAt = updateData.adminRepliedAt ? new Date(updateData.adminRepliedAt) : null;
+      }
       cleanUpdate.updatedAt = new Date();
 
       const updated = await dbInstance

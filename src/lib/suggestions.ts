@@ -1,19 +1,4 @@
-import { 
-  collection, 
-  addDoc, 
-  getDocs, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  query, 
-  orderBy, 
-  serverTimestamp,
-  onSnapshot,
-  setDoc,
-  getDoc
-} from "firebase/firestore";
-import { db, safeFirestoreWrite, handleQuotaExceeded } from "./firebase";
-import { addStudyFile, type StudyFile, getStoredPlatforms, saveStoredPlatforms, getStoredFlashcards, saveStoredFlashcards } from "./cloud-sync";
+import { addStudyFile, getStoredPlatforms, saveStoredPlatforms, getStoredFlashcards, saveStoredFlashcards } from "./cloud-sync";
 
 export type SuggestionType = "file" | "platform" | "flashcard" | "quiz" | "assignment" | "schedule" | "calendar" | "general";
 export type SuggestionStatus = "pending" | "approved" | "rejected";
@@ -24,12 +9,14 @@ export interface StudentSuggestion {
   title: string;
   category?: string;
   description?: string;
-  data: any; // specific payload (file url, platform details, flashcard details, quiz details)
+  data: any; // specific payload
   studentId: number;
   studentName: string;
   studentUsername?: string;
   status: SuggestionStatus;
-  adminFeedback?: string;
+  adminReply?: string;
+  adminRepliedAt?: string;
+  adminFeedback?: string; // Backwards compatible alias
   reviewedBy?: string;
   createdAt: string;
   updatedAt?: string;
@@ -39,17 +26,8 @@ const LOCAL_STORAGE_SUGGESTIONS_KEY = "talented_student_suggestions_v1";
 
 export function getLocalSuggestions(): StudentSuggestion[] {
   try {
-    const raw1 = localStorage.getItem(LOCAL_STORAGE_SUGGESTIONS_KEY);
-    const raw2 = localStorage.getItem("student_suggestions");
-    const list1: StudentSuggestion[] = raw1 ? JSON.parse(raw1) : [];
-    const list2: StudentSuggestion[] = raw2 ? JSON.parse(raw2) : [];
-
-    const map = new Map<string, StudentSuggestion>();
-    list1.forEach(s => map.set(s.id, s));
-    list2.forEach(s => map.set(s.id, s));
-    return Array.from(map.values()).sort((a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    const raw = localStorage.getItem(LOCAL_STORAGE_SUGGESTIONS_KEY);
+    return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
@@ -57,16 +35,13 @@ export function getLocalSuggestions(): StudentSuggestion[] {
 
 export function saveLocalSuggestions(list: StudentSuggestion[]) {
   try {
-    const jsonStr = JSON.stringify(list);
-    localStorage.setItem(LOCAL_STORAGE_SUGGESTIONS_KEY, jsonStr);
-    localStorage.setItem("student_suggestions", jsonStr);
+    localStorage.setItem(LOCAL_STORAGE_SUGGESTIONS_KEY, JSON.stringify(list));
     window.dispatchEvent(new CustomEvent("student_suggestions_change", { detail: { suggestions: list } }));
-    window.dispatchEvent(new CustomEvent("app_data_change", { detail: { key: "student_suggestions", value: list } }));
   } catch {}
 }
 
 /**
- * Submit a new student suggestion
+ * Submit a new student suggestion/request
  */
 export async function submitStudentSuggestion(params: {
   type: SuggestionType;
@@ -92,129 +67,90 @@ export async function submitStudentSuggestion(params: {
     createdAt: new Date().toISOString(),
   };
 
+  // Add to local list first for instant UI response
   const current = getLocalSuggestions();
   saveLocalSuggestions([newSuggestion, ...current]);
 
-  // Sync to backend API
+  // Save to the SQL database API
   try {
-    await fetch("/api/suggestions", {
+    const response = await fetch("/api/suggestions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newSuggestion),
     });
-  } catch {}
-
-  // Sync to Firestore
-  safeFirestoreWrite(async () => {
-    const docRef = doc(db, "suggestions", newSuggestion.id);
-    await setDoc(docRef, {
-      ...newSuggestion,
-      serverTime: serverTimestamp()
-    });
-  });
+    if (response.ok) {
+      const result = await response.json();
+      if (result.data && result.data[0]) {
+        return result.data[0];
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to save suggestion to backend, using local store:", err);
+  }
 
   return newSuggestion;
 }
 
 /**
- * Subscribe to suggestions in real-time
+ * Fetch all suggestions/requests from the backend
+ */
+export async function fetchAllSuggestionsFromServer(): Promise<StudentSuggestion[]> {
+  try {
+    const res = await fetch("/api/suggestions");
+    if (res.ok) {
+      const list: StudentSuggestion[] = await res.json();
+      if (Array.isArray(list)) {
+        // Map fields for safety and JSON parsing of data
+        const mappedList = list.map((item: any) => {
+          let parsedData = item.data;
+          if (typeof item.data === "string") {
+            try {
+              parsedData = JSON.parse(item.data);
+            } catch {
+              parsedData = item.data;
+            }
+          }
+          return {
+            ...item,
+            data: parsedData || {},
+            adminFeedback: item.adminReply || item.adminFeedback, // alias support
+          };
+        });
+        saveLocalSuggestions(mappedList);
+        return mappedList;
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to fetch suggestions from backend:", e);
+  }
+  return getLocalSuggestions();
+}
+
+/**
+ * Subscribe to suggestions (polls the backend every 4 seconds for updates)
  */
 export function subscribeToSuggestions(onUpdate: (suggestions: StudentSuggestion[]) => void): () => void {
-  // Emit initial local
+  // Emit current local cache immediately
   onUpdate(getLocalSuggestions());
 
   const handleLocal = (e: any) => {
     if (e.detail?.suggestions) {
       onUpdate(e.detail.suggestions);
-    } else {
-      onUpdate(getLocalSuggestions());
     }
   };
   window.addEventListener("student_suggestions_change", handleLocal);
 
-  // Poll backend API every 3 seconds for guaranteed multi-client cross-browser sync
-  const fetchFromApi = async () => {
-    try {
-      const localList = getLocalSuggestions();
-      
-      // Push local items to server if server doesn't have them
-      if (localList.length > 0) {
-        try {
-          await fetch("/api/suggestions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(localList),
-          });
-        } catch (e) {
-          console.warn("Failed to push suggestions to server:", e);
-        }
-      }
-
-      const res = await fetch("/api/suggestions");
-      if (res.ok) {
-        const apiList: StudentSuggestion[] = await res.json();
-        if (Array.isArray(apiList)) {
-          const map = new Map<string, StudentSuggestion>();
-          localList.forEach(s => map.set(s.id, s));
-          apiList.forEach(s => map.set(s.id, s));
-          const merged = Array.from(map.values()).sort(
-            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-          saveLocalSuggestions(merged);
-          onUpdate(merged);
-        }
-      }
-    } catch {}
+  const poll = async () => {
+    const updated = await fetchAllSuggestionsFromServer();
+    onUpdate(updated);
   };
 
-  fetchFromApi();
-  const pollInterval = setInterval(fetchFromApi, 3000);
-
-  let unsubFirestore = () => {};
-  try {
-    const q = query(collection(db, "suggestions"), orderBy("createdAt", "desc"));
-    unsubFirestore = onSnapshot(q, (snapshot) => {
-      const cloudList: StudentSuggestion[] = [];
-      snapshot.forEach((docSnap) => {
-        const d = docSnap.data();
-        cloudList.push({
-          id: docSnap.id,
-          type: d.type || "file",
-          title: d.title || "اقتراح",
-          category: d.category,
-          description: d.description,
-          data: d.data || {},
-          studentId: d.studentId || 1,
-          studentName: d.studentName || "طالب",
-          studentUsername: d.studentUsername,
-          status: d.status || "pending",
-          adminFeedback: d.adminFeedback,
-          reviewedBy: d.reviewedBy,
-          createdAt: d.createdAt || new Date().toISOString(),
-          updatedAt: d.updatedAt,
-        });
-      });
-
-      // Merge local with cloud
-      const local = getLocalSuggestions();
-      const map = new Map<string, StudentSuggestion>();
-      local.forEach(s => map.set(s.id, s));
-      cloudList.forEach(s => map.set(s.id, s));
-      const merged = Array.from(map.values()).sort((a, b) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      
-      saveLocalSuggestions(merged);
-      onUpdate(merged);
-    }, (err) => {
-      console.warn("Suggestions realtime error:", err);
-    });
-  } catch {}
+  poll();
+  const timer = setInterval(poll, 4000);
 
   return () => {
     window.removeEventListener("student_suggestions_change", handleLocal);
-    clearInterval(pollInterval);
-    unsubFirestore();
+    clearInterval(timer);
   };
 }
 
@@ -229,6 +165,8 @@ export async function approveStudentSuggestion(
     ...suggestion,
     status: "approved",
     reviewedBy: adminName,
+    adminReply: "تمت الموافقة والنشر بنجاح ✅",
+    adminRepliedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
@@ -300,85 +238,79 @@ export async function approveStudentSuggestion(
     console.error("Error publishing approved suggestion:", e);
   }
 
-  // 2. Update suggestion status in storage & Firestore & API
-  const list = getLocalSuggestions().map(s => s.id === suggestion.id ? updated : s);
-  saveLocalSuggestions(list);
-
+  // 2. Update status in DB
   try {
     await fetch(`/api/suggestions/${suggestion.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updated),
+      body: JSON.stringify({
+        status: "approved",
+        adminReply: "تمت الموافقة والنشر بنجاح ✅",
+        adminRepliedAt: new Date().toISOString(),
+      }),
     });
-  } catch {}
+  } catch (err) {
+    console.warn("Failed to update suggestion in backend:", err);
+  }
 
-  safeFirestoreWrite(async () => {
-    const docRef = doc(db, "suggestions", suggestion.id);
-    await setDoc(docRef, { ...updated, serverTime: serverTimestamp() }, { merge: true });
-  });
+  // Update local
+  const list = getLocalSuggestions().map(s => s.id === suggestion.id ? updated : s);
+  saveLocalSuggestions(list);
 }
 
 /**
- * Admin: Reject a suggestion with optional feedback
+ * Admin: Reject a suggestion with a feedback message/reply
  */
 export async function rejectStudentSuggestion(
   id: string,
-  feedback?: string,
+  replyText?: string,
   adminName: string = "المشرف"
 ): Promise<void> {
+  const reply = replyText || "تمت المراجعة والاعتذار عن النشر حالياً";
+  const replyTime = new Date().toISOString();
+
+  try {
+    await fetch(`/api/suggestions/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "rejected",
+        adminReply: reply,
+        adminRepliedAt: replyTime,
+      }),
+    });
+  } catch (err) {
+    console.warn("Failed to reject suggestion in backend:", err);
+  }
+
   const current = getLocalSuggestions();
-  let updatedRecord: StudentSuggestion | null = null;
   const updated = current.map(s => {
     if (s.id === id) {
-      updatedRecord = {
+      return {
         ...s,
         status: "rejected" as const,
-        adminFeedback: feedback || "تمت المراجعة والاعتذار عن النشر حالياً",
+        adminReply: reply,
+        adminFeedback: reply, // alias
+        adminRepliedAt: replyTime,
         reviewedBy: adminName,
-        updatedAt: new Date().toISOString(),
+        updatedAt: replyTime,
       };
-      return updatedRecord;
     }
     return s;
   });
-
   saveLocalSuggestions(updated);
-
-  if (updatedRecord) {
-    try {
-      await fetch(`/api/suggestions/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedRecord),
-      });
-    } catch {}
-  }
-
-  safeFirestoreWrite(async () => {
-    const docRef = doc(db, "suggestions", id);
-    await setDoc(docRef, {
-      status: "rejected",
-      adminFeedback: feedback || "تمت المراجعة والاعتذار عن النشر حالياً",
-      reviewedBy: adminName,
-      updatedAt: new Date().toISOString(),
-      serverTime: serverTimestamp()
-    }, { merge: true });
-  });
 }
 
 /**
- * Delete a suggestion
+ * Delete a suggestion completely
  */
 export async function deleteStudentSuggestion(id: string): Promise<void> {
-  const current = getLocalSuggestions().filter(s => s.id !== id);
-  saveLocalSuggestions(current);
-
   try {
     await fetch(`/api/suggestions/${id}`, { method: "DELETE" });
-  } catch {}
+  } catch (err) {
+    console.warn("Failed to delete suggestion in backend:", err);
+  }
 
-  safeFirestoreWrite(async () => {
-    const docRef = doc(db, "suggestions", id);
-    await deleteDoc(docRef);
-  });
+  const current = getLocalSuggestions().filter(s => s.id !== id);
+  saveLocalSuggestions(current);
 }

@@ -135,6 +135,8 @@ export const suggestions = pgTable("suggestions", {
   studentName: text("student_name"),
   studentUsername: text("student_username"),
   status: text("status").notNull().default("pending"),
+  adminReply: text("admin_reply"),
+  adminRepliedAt: timestamp("admin_replied_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
