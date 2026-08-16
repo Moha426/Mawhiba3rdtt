@@ -132,18 +132,22 @@ export function subscribeToSuggestions(onUpdate: (suggestions: StudentSuggestion
   };
   window.addEventListener("student_suggestions_change", handleLocal);
 
-  // Poll backend API every 2 seconds for guaranteed multi-client cross-browser sync
+  // Poll backend API every 3 seconds for guaranteed multi-client cross-browser sync
   const fetchFromApi = async () => {
     try {
       const localList = getLocalSuggestions();
       
       // Push local items to server if server doesn't have them
       if (localList.length > 0) {
-        fetch("/api/suggestions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(localList),
-        }).catch(() => {});
+        try {
+          await fetch("/api/suggestions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(localList),
+          });
+        } catch (e) {
+          console.warn("Failed to push suggestions to server:", e);
+        }
       }
 
       const res = await fetch("/api/suggestions");

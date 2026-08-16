@@ -108,6 +108,8 @@ export function DownloadAppModal({ isOpen, onClose }: Props) {
   <meta charset="UTF-8">
   <meta http-equiv="refresh" content="0; url=${url}">
   <title>منصة ثالث موهبة</title>
+  <link rel="icon" type="image/png" href="${url}/app-icon.png">
+  <link rel="apple-touch-icon" href="${url}/app-icon.png">
   <style>
     body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0f172a; color: white; text-align: center; }
     a { color: #38bdf8; font-size: 20px; text-decoration: none; font-weight: bold; }
