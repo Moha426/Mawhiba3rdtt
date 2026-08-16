@@ -92,15 +92,32 @@ ${questionText.trim()}
         });
       }
 
-      const response = await ai.models.generateContent({ 
-        model: "gemini-3.7-flash",
-        contents: parts,
-        config: { responseMimeType: "application/json" }
-      });
-      const textResponse = response.text;
+      const modelsToTry = ["gemini-2.5-flash", "gemini-3.7-flash", "gemini-1.5-flash"];
+      let textResponse: string | null = null;
+
+      for (const modelName of modelsToTry) {
+        try {
+          const response = await ai.models.generateContent({ 
+            model: modelName,
+            contents: parts,
+            config: { responseMimeType: "application/json" }
+          });
+          if (response?.text) {
+            textResponse = response.text;
+            break;
+          }
+        } catch (modelErr) {
+          console.warn(`Gemini model ${modelName} attempt error:`, modelErr);
+        }
+      }
+
       if (textResponse) {
         try {
-          const parsed = JSON.parse(textResponse);
+          let cleanJson = textResponse.trim();
+          if (cleanJson.startsWith("```")) {
+            cleanJson = cleanJson.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
+          }
+          const parsed = JSON.parse(cleanJson);
           if (parsed && parsed.answer && Array.isArray(parsed.steps)) {
             return {
               extractedQuestion: parsed.extractedQuestion || questionText || "مسألة من الصورة المرفقة",

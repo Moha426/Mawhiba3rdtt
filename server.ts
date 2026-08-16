@@ -386,6 +386,62 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // Registered Students Management
+  const memoryStudents = new Map<number, any>();
+
+  app.get("/api/students", (_req, res) => {
+    res.json(Array.from(memoryStudents.values()));
+  });
+
+  app.post("/api/students", (req, res) => {
+    const student = req.body;
+    if (student && student.id) {
+      memoryStudents.set(student.id, student);
+    }
+    res.json({ success: true, student });
+  });
+
+  app.put("/api/students/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const existing = memoryStudents.get(id) || {};
+    const updated = { ...existing, ...req.body, id };
+    memoryStudents.set(id, updated);
+    res.json(updated);
+  });
+
+  app.delete("/api/students/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    memoryStudents.delete(id);
+    res.json({ success: true });
+  });
+
+  app.post("/api/student-auth/register", (req, res) => {
+    const { displayName, email, password, username } = req.body || {};
+    const cleanName = displayName || username || email?.split("@")[0] || "طالب متميز";
+    
+    let hash = 0;
+    const seed = email || cleanName;
+    for (let i = 0; i < seed.length; i++) {
+      hash = (hash << 5) - hash + seed.charCodeAt(i);
+      hash |= 0;
+    }
+    const id = Math.abs(hash) || Math.floor(1000 + Math.random() * 9000);
+
+    const student = {
+      id,
+      displayName: cleanName,
+      username: username || email?.split("@")[0] || cleanName.replace(/\s+/g, "_"),
+      email: email || `${cleanName}@talented.app`,
+      password: password || "123456",
+      role: "student",
+      points: 350,
+      createdAt: new Date().toISOString(),
+    };
+
+    memoryStudents.set(id, student);
+    res.json({ success: true, user: student });
+  });
+
   // Room Members Endpoint
   app.get("/api/rooms/:roomId/members", (req, res) => {
     const roomId = parseInt(req.params.roomId, 10) || 1;

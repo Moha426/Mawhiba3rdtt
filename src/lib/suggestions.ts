@@ -39,8 +39,17 @@ const LOCAL_STORAGE_SUGGESTIONS_KEY = "talented_student_suggestions_v1";
 
 export function getLocalSuggestions(): StudentSuggestion[] {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_SUGGESTIONS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const raw1 = localStorage.getItem(LOCAL_STORAGE_SUGGESTIONS_KEY);
+    const raw2 = localStorage.getItem("student_suggestions");
+    const list1: StudentSuggestion[] = raw1 ? JSON.parse(raw1) : [];
+    const list2: StudentSuggestion[] = raw2 ? JSON.parse(raw2) : [];
+
+    const map = new Map<string, StudentSuggestion>();
+    list1.forEach(s => map.set(s.id, s));
+    list2.forEach(s => map.set(s.id, s));
+    return Array.from(map.values()).sort((a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   } catch {
     return [];
   }
@@ -48,8 +57,11 @@ export function getLocalSuggestions(): StudentSuggestion[] {
 
 export function saveLocalSuggestions(list: StudentSuggestion[]) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_SUGGESTIONS_KEY, JSON.stringify(list));
+    const jsonStr = JSON.stringify(list);
+    localStorage.setItem(LOCAL_STORAGE_SUGGESTIONS_KEY, jsonStr);
+    localStorage.setItem("student_suggestions", jsonStr);
     window.dispatchEvent(new CustomEvent("student_suggestions_change", { detail: { suggestions: list } }));
+    window.dispatchEvent(new CustomEvent("app_data_change", { detail: { key: "student_suggestions", value: list } }));
   } catch {}
 }
 

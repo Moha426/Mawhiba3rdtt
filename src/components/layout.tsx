@@ -34,6 +34,8 @@ import {
   X,
   ChevronUp,
   Check,
+  Download,
+  Smartphone,
 } from "lucide-react";
 import { AppLogo } from "@/components/app-logo";
 import { Button } from "@/components/ui/button";
@@ -43,6 +45,7 @@ import { useTheme, COLOR_THEMES, type ColorTheme } from "@/lib/theme";
 import { NotificationBell } from "@/components/notification-bell";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { DownloadAppModal } from "@/components/download-app-modal";
 
 interface LayoutProps {
   children: ReactNode;
@@ -380,6 +383,18 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </div>
 
+      {/* Direct App Download / Install button */}
+      <button
+        onClick={() => setDownloadModalOpen(true)}
+        className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 transition-all group text-xs font-bold"
+      >
+        <div className="flex items-center gap-2">
+          <Smartphone className="h-4 w-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+          <span>تنزيل وتثبيت التطبيق</span>
+        </div>
+        <Download className="h-3.5 w-3.5 opacity-70" />
+      </button>
+
       <AnimatePresence mode="wait">
         {studentProfile ? (
           <motion.div
@@ -447,58 +462,70 @@ export function Layout({ children }: LayoutProps) {
     </div>
   );
 
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-background">
+      <DownloadAppModal isOpen={downloadModalOpen} onClose={() => setDownloadModalOpen(false)} />
 
       {/* ─── Mobile top header ─── */}
       <header
-        className="lg:hidden fixed top-3 inset-x-2.5 sm:inset-x-3 z-50 h-14 sm:h-16 rounded-[42px] flex items-center px-3 sm:px-4 gap-1.5 sm:gap-2 overflow-hidden"
+        className="lg:hidden fixed top-2.5 inset-x-2 sm:inset-x-3 z-50 h-13 sm:h-15 rounded-[36px] flex items-center px-2.5 sm:px-4 gap-1 sm:gap-1.5 overflow-hidden"
         style={{
           background: theme === "dark"
-            ? "rgba(15, 10, 30, 0.75)"
-            : "rgba(255, 255, 255, 0.85)",
-          backdropFilter: "blur(20px) saturate(180%)",
-          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+            ? "rgba(15, 10, 30, 0.82)"
+            : "rgba(255, 255, 255, 0.88)",
+          backdropFilter: "blur(24px) saturate(180%)",
+          WebkitBackdropFilter: "blur(24px) saturate(180%)",
           border: theme === "dark"
-            ? "1px solid rgba(255,255,255,0.10)"
-            : "1px solid rgba(0,0,0,0.07)",
+            ? "1px solid rgba(255,255,255,0.12)"
+            : "1px solid rgba(0,0,0,0.08)",
           boxShadow: theme === "dark"
-            ? "0 4px 32px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.06) inset"
+            ? "0 4px 28px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.08) inset"
             : "0 4px 20px rgba(0,0,0,0.08), 0 1px 0 rgba(255,255,255,0.9) inset",
         }}
       >
         <motion.div
           onClick={handleAdminEasterEgg}
           whileTap={{ scale: 0.92 }}
-          className="cursor-pointer select-none py-1 flex items-center shrink-0 min-w-0"
+          className="cursor-pointer select-none py-1 flex items-center shrink min-w-0"
         >
-          <AppLogo className="h-8 sm:h-11 w-auto max-w-[100px] sm:max-w-[140px]" />
+          <AppLogo className="h-7 sm:h-10 w-auto max-w-[80px] sm:max-w-[130px] object-contain" />
         </motion.div>
         {siteSettings?.schoolName && (
-          <span className="hidden md:inline-block text-xs font-semibold text-foreground/70 truncate max-w-[100px]">
+          <span className="hidden md:inline-block text-xs font-semibold text-foreground/70 truncate max-w-[90px]">
             {siteSettings.schoolName}
           </span>
         )}
         <div className="flex-1 min-w-0" />
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setDownloadModalOpen(true)}
+            title="تنزيل وتثبيت التطبيق"
+            className="h-7 w-7 rounded-full text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 p-0"
+          >
+            <Smartphone className="h-3.5 w-3.5" />
+          </Button>
           {studentProfile && <NotificationBell />}
           <ColorThemePicker popupDirection="down" />
           <ThemeButton />
           {studentProfile ? (
             <Link href="/profile">
               <motion.div
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.95 }}
-                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 bg-primary/10 text-primary rounded-full border border-primary/20 cursor-pointer shrink-0 max-w-[85px] sm:max-w-[120px]"
+                className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-primary/10 text-primary rounded-full border border-primary/20 cursor-pointer shrink min-w-0 max-w-[70px] sm:max-w-[110px] overflow-hidden"
               >
-                <div className="h-5 w-5 rounded-full overflow-hidden bg-primary/20 flex items-center justify-center shrink-0">
+                <div className="h-4.5 w-4.5 sm:h-5 sm:w-5 rounded-full overflow-hidden bg-primary/20 flex items-center justify-center shrink-0">
                   {studentProfile.profilePicture ? (
                     <img src={studentProfile.profilePicture} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <span className="text-[9px] font-bold text-primary">{studentProfile.displayName.charAt(0)}</span>
                   )}
                 </div>
-                <span className="text-[11px] sm:text-xs font-semibold truncate leading-none">
+                <span className="text-[10px] sm:text-xs font-bold truncate leading-none block max-w-[40px] sm:max-w-[70px]">
                   {studentProfile.displayName.split(" ")[0]}
                 </span>
               </motion.div>
@@ -584,7 +611,7 @@ export function Layout({ children }: LayoutProps) {
       </aside>
 
       {/* ─── Mobile floating bottom nav ─── */}
-      <MobileBottomNav location={location} />
+      <MobileBottomNav location={location} onOpenDownload={() => setDownloadModalOpen(true)} />
 
       {/* ─── Animated background orbs (CPU-light, CSS animation only) ─── */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
@@ -635,7 +662,7 @@ export function Layout({ children }: LayoutProps) {
 }
 
 /* ─── Mobile floating bottom navigation ─── */
-function MobileBottomNav({ location }: { location: string }) {
+function MobileBottomNav({ location, onOpenDownload }: { location: string; onOpenDownload: () => void }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const isAdmin = localStorage.getItem("isAdmin") === "true";
@@ -841,6 +868,28 @@ function MobileBottomNav({ location }: { location: string }) {
                     </motion.button>
                   );
                 })}
+              </div>
+
+              {/* Install App Quick Action in Drawer */}
+              <div className="px-5 pb-2">
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    onOpenDownload();
+                  }}
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600/15 via-teal-600/15 to-emerald-600/10 hover:from-emerald-600/25 hover:to-teal-600/20 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 transition-all text-right group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/30 shrink-0 group-hover:scale-105 transition-transform">
+                      <Smartphone className="h-5 w-5" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-foreground">تنزيل وتثبيت التطبيق على جهازك</span>
+                      <span className="text-[10.5px] text-muted-foreground">يعمل على أندرويد، آيفون والكمبيوتر (PWA)</span>
+                    </div>
+                  </div>
+                  <Download className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                </button>
               </div>
 
               <div className="px-5 pb-8 pt-1">

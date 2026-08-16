@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
+import { registerOrUpdateStudent } from "./students-manager";
 
 interface User {
   id: string;
   name: string;
   username: string;
+  email?: string;
 }
 
 interface AuthContextType {
@@ -14,7 +16,8 @@ interface AuthContextType {
   isSignedIn: boolean;
   isLoaded: boolean;
   getToken: () => Promise<string | null>;
-  login: (username: string) => Promise<void>;
+  login: (username: string, email?: string, password?: string) => Promise<void>;
+  register: (displayName: string, email: string, password: string) => Promise<void>;
   logout: (opts?: any) => Promise<void>;
 }
 
@@ -121,22 +124,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
 
-  const login = async (username: string) => {
+  const login = async (username: string, email?: string, password?: string) => {
     setIsLoading(true);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    // Calculate stable numeric ID hash for user
-    let hash = 0;
-    for (let i = 0; i < username.length; i++) {
-      hash = (hash << 5) - hash + username.charCodeAt(i);
-      hash |= 0;
-    }
-    const cleanId = String(Math.abs(hash) || Math.floor(Math.random() * 8999) + 1000);
+    const rec = await registerOrUpdateStudent({
+      displayName: username.trim(),
+      username: username.trim(),
+      email: email?.trim(),
+      password: password?.trim() || "123456",
+    });
 
     const newUser = {
-      id: cleanId,
-      name: username.trim(),
-      username: username.trim(),
+      id: String(rec.id),
+      name: rec.displayName,
+      username: rec.username,
+      email: rec.email,
+    };
+
+    setUser(newUser);
+    localStorage.setItem("auth_user", JSON.stringify(newUser));
+    notifyAllFrames(newUser);
+
+    qc.invalidateQueries({ queryKey: ["student-profile"] });
+    setIsLoading(false);
+  };
+
+  const register = async (displayName: string, email: string, password: string) => {
+    setIsLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const rec = await registerOrUpdateStudent({
+      displayName: displayName.trim(),
+      email: email.trim(),
+      password: password.trim(),
+    });
+
+    const newUser = {
+      id: String(rec.id),
+      name: rec.displayName,
+      username: rec.username,
+      email: rec.email,
     };
 
     setUser(newUser);
@@ -172,6 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoaded: !isLoading, 
       getToken, 
       login, 
+      register,
       logout 
     }}>
       {children}

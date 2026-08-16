@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { StudentSuggestDialog } from "@/components/student-suggest-dialog";
 import { usePersistentState } from "@/lib/api-client-react";
 import { DEFAULT_COMMUNITY_CHANNELS, type CommunityChannel } from "@/components/admin/channels-tab";
+import { DownloadAppModal } from "@/components/download-app-modal";
 import {
   Dialog,
   DialogContent,
@@ -74,6 +75,7 @@ export default function ChannelsPage() {
   // PWA Install State
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   useEffect(() => {
     if (window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone) {
@@ -89,7 +91,7 @@ export default function ChannelsPage() {
     window.addEventListener("appinstalled", () => {
       setIsAppInstalled(true);
       setInstallPrompt(null);
-      toast({ title: "تم التثبيت بنجاح", description: "أصبح تطبيق ثالث موهبة مثبتاً الآن على جهازك الأندرويد" });
+      toast({ title: "تم التثبيت بنجاح 🎉", description: "أصبح تطبيق ثالث موهبة مثبتاً الآن على جهازك" });
     });
 
     return () => {
@@ -99,18 +101,19 @@ export default function ChannelsPage() {
 
   const handleInstallClick = async () => {
     if (installPrompt) {
-      installPrompt.prompt();
-      const choice = await installPrompt.userChoice;
-      if (choice.outcome === "accepted") {
-        setIsAppInstalled(true);
-        setInstallPrompt(null);
+      try {
+        installPrompt.prompt();
+        const choice = await installPrompt.userChoice;
+        if (choice.outcome === "accepted") {
+          setIsAppInstalled(true);
+          setInstallPrompt(null);
+          return;
+        }
+      } catch (err) {
+        console.warn(err);
       }
-    } else {
-      toast({
-        title: "تثبيت تطبيق الأندرويد",
-        description: "لتثبيت التطبيق: اضغط على قائمة المتصفح (⋮) بأعلى الشاشة ثم اختر 'تثبيت التطبيق' أو 'إضافة إلى الشاشة الرئيسية'.",
-      });
     }
+    setIsDownloadModalOpen(true);
   };
 
   const handleSaveChannel = async () => {
@@ -620,6 +623,8 @@ export default function ChannelsPage() {
           <p className="text-xs text-muted-foreground mt-1">جرّب تغيير عبارة البحث أو إرسال اقتراح قناة جديدة</p>
         </div>
       )}
+
+      <DownloadAppModal isOpen={isDownloadModalOpen} onClose={() => setIsDownloadModalOpen(false)} />
     </div>
   );
 }
