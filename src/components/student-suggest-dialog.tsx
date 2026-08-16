@@ -94,9 +94,9 @@ export function StudentSuggestDialog({
     }
 
     const contentUrl = fileDataUrl || url.trim();
-    const isUrlOptional = type === "flashcard" || type === "assignment" || type === "schedule" || type === "calendar" || type === "general";
-    if (!isUrlOptional && !contentUrl) {
-      toast({ title: "يرجى إرفاق رابط أو رفع ملف", variant: "destructive" });
+    // Allow suggestions even if URL or file is omitted (text-only proposals)
+    if (!title.trim() && !description.trim()) {
+      toast({ title: "يرجى كتابة عنوان أو تفاصيل للاقتراح", variant: "destructive" });
       return;
     }
 

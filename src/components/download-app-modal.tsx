@@ -170,14 +170,17 @@ export function DownloadAppModal({ isOpen, onClose }: Props) {
           </div>
         </DialogHeader>
 
-        {isInstalled && (
-          <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 p-3.5 rounded-2xl flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-            <div className="text-xs font-semibold leading-relaxed">
-              التطبيق مثبت بالفعل على جهازك! يمكنك تشغيله مباشرة من قائمة التطبيقات أو الشاشة الرئيسية.
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-orange-500/10 border border-orange-500/30">
+            <img
+              src="/app-icon.png"
+              alt="أيقونة التطبيق الرسمية"
+              className="h-12 w-12 rounded-2xl object-cover shadow-md border border-orange-500/40 shrink-0"
+            />
+            <div>
+              <div className="text-xs font-bold text-foreground">أيقونة التطبيق الرسمية (منصة ثالث موهبة)</div>
+              <div className="text-[11px] text-muted-foreground">تظهر كأيقونة تطبيق برتقالية مميزة عند تثبيته على الشاشة الرئيسية</div>
             </div>
           </div>
-        )}
 
         {/* Quick Native Install Button if browser supports it */}
         {deferredPrompt && (

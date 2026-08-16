@@ -453,11 +453,13 @@ async function startServer() {
   });
 
   app.post("/api/suggestions", (req, res) => {
-    const item = req.body;
-    if (item && item.id) {
-      memorySuggestions.set(item.id, item);
-    }
-    res.json({ success: true, item });
+    const items = Array.isArray(req.body) ? req.body : [req.body];
+    items.forEach((item) => {
+      if (item && item.id) {
+        memorySuggestions.set(item.id, item);
+      }
+    });
+    res.json({ success: true, count: memorySuggestions.size });
   });
 
   app.put("/api/suggestions/:id", (req, res) => {

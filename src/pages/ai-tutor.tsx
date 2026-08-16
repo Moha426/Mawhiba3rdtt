@@ -148,11 +148,12 @@ export default function AITutorPage() {
     tips: string[];
   } | null>(null);
 
-  useEffect(() => {
-    // Merge any remote questions if backend API available
-    fetch("/api/escalated-questions")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
+  const fetchMyQuestions = async () => {
+    setLoadingQuestions(true);
+    try {
+      const res = await fetch("/api/escalated-questions");
+      if (res.ok) {
+        const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           setAllEscalatedQuestions((prev) => {
             const map = new Map<number, StudentEscalatedQ>();
@@ -161,8 +162,16 @@ export default function AITutorPage() {
             return Array.from(map.values());
           });
         }
-      })
-      .catch(() => {});
+      }
+    } catch (err) {
+      console.warn("Failed to fetch escalated questions:", err);
+    } finally {
+      setLoadingQuestions(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMyQuestions();
   }, []);
 
   const handleImageFile = (file: File) => {

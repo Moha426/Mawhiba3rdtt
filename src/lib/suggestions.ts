@@ -132,15 +132,26 @@ export function subscribeToSuggestions(onUpdate: (suggestions: StudentSuggestion
   };
   window.addEventListener("student_suggestions_change", handleLocal);
 
-  // Poll backend API every 3 seconds for guaranteed multi-client cross-browser sync
+  // Poll backend API every 2 seconds for guaranteed multi-client cross-browser sync
   const fetchFromApi = async () => {
     try {
+      const localList = getLocalSuggestions();
+      
+      // Push local items to server if server doesn't have them
+      if (localList.length > 0) {
+        fetch("/api/suggestions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(localList),
+        }).catch(() => {});
+      }
+
       const res = await fetch("/api/suggestions");
       if (res.ok) {
         const apiList: StudentSuggestion[] = await res.json();
-        if (Array.isArray(apiList) && apiList.length > 0) {
+        if (Array.isArray(apiList)) {
           const map = new Map<string, StudentSuggestion>();
-          getLocalSuggestions().forEach(s => map.set(s.id, s));
+          localList.forEach(s => map.set(s.id, s));
           apiList.forEach(s => map.set(s.id, s));
           const merged = Array.from(map.values()).sort(
             (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()

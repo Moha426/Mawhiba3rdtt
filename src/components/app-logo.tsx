@@ -37,7 +37,6 @@ export function AppLogo({
           className={imgClasses}
           referrerPolicy="no-referrer"
           onError={(e) => {
-            // Try secondary source before switching to SVG fallback
             const target = e.currentTarget;
             if (target.src.endsWith(primarySrc)) {
               target.src = secondarySrc;
@@ -47,11 +46,8 @@ export function AppLogo({
           }}
         />
       ) : (
-        /* Bulletproof Inline SVG Fallback: inherits currentColor from text-foreground/primary */
-        <div className={`flex items-center gap-2 font-black text-lg ${isDark ? "text-white" : "text-slate-900"} ${className}`}>
-          <div className="h-8 w-8 rounded-xl bg-primary/20 text-primary border border-primary/30 flex items-center justify-center font-black text-base shadow-sm">
-            ٣
-          </div>
+        <div className={`flex items-center gap-2 font-black text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
+          <img src="/app-icon.png" alt="شعار" className="h-7 w-7 rounded-lg object-contain" />
           <span className="tracking-tight text-sm md:text-base font-black">ثالث موهبة</span>
         </div>
       )}
