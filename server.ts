@@ -29,14 +29,6 @@ import {
   insertSuggestion,
   updateSuggestion,
   deleteSuggestion,
-  getAllPolls,
-  insertPoll,
-  updatePoll,
-  deletePoll,
-  getPollVotes,
-  submitVote,
-  withdrawVote,
-  syncPollVotes,
 } from "./src/db/queries";
 import { 
   solveProblemWithGemini, 
@@ -518,104 +510,6 @@ async function startServer() {
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to delete suggestion" });
-    }
-  });
-
-  // Polls & Voting Management
-  app.get("/api/polls", async (_req, res) => {
-    try {
-      const list = await getAllPolls();
-      res.json(list);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || "Failed to fetch polls" });
-    }
-  });
-
-  app.post("/api/polls", async (req, res) => {
-    try {
-      const inserted = await insertPoll(req.body);
-      res.json(inserted);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || "Failed to create poll" });
-    }
-  });
-
-  app.put("/api/polls/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id, 10);
-      const updated = await updatePoll(id, req.body);
-      res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || "Failed to update poll" });
-    }
-  });
-
-  app.delete("/api/polls/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id, 10);
-      const result = await deletePoll(id);
-      if (result && (result as any).success === false) {
-        return res.status(404).json(result);
-      }
-      res.json({ success: true });
-    } catch (err: any) {
-      console.error("Delete poll error:", err);
-      res.status(500).json({ error: err.message || "Failed to delete poll" });
-    }
-  });
-
-  app.post("/api/polls/:id/sync", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id, 10);
-      const result = await syncPollVotes(id);
-      res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || "Failed to sync votes" });
-    }
-  });
-
-  app.get("/api/polls/:id/votes", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id, 10);
-      const list = await getPollVotes(id);
-      res.json(list);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || "Failed to fetch votes" });
-    }
-  });
-
-  app.post("/api/polls/:id/vote", async (req, res) => {
-    try {
-      const pollId = parseInt(req.params.id, 10);
-      const voteData = { ...req.body, pollId };
-      const result = await submitVote(voteData);
-      res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || "Failed to submit vote" });
-    }
-  });
-
-  app.post("/api/polls/:id/withdraw", async (req, res) => {
-    try {
-      const pollId = parseInt(req.params.id, 10);
-      const { userName, userId } = req.body;
-      const result = await withdrawVote(pollId, userName, userId);
-      res.json(result);
-    } catch (err: any) {
-      console.error("Error in /api/polls/:id/withdraw:", err);
-      res.status(400).json({ error: err.message || "Failed to withdraw vote" });
-    }
-  });
-
-  app.delete("/api/polls/:id/vote", async (req, res) => {
-    // Keep for backward compatibility but redirect to withdraw logic
-    try {
-      const pollId = parseInt(req.params.id, 10);
-      const { userName, userId } = req.body;
-      const result = await withdrawVote(pollId, userName, userId);
-      res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || "Failed to withdraw vote" });
     }
   });
 
