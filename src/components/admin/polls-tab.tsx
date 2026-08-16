@@ -105,12 +105,12 @@ export function PollsTab() {
       imageUrl: imageUrl.trim() || undefined,
       isPublic: isPublic,
       preventWithdraw: preventWithdraw,
+      allowMultiple: allowMultiple,
       status: "active" as const,
     };
 
     if (pollType === "choice") {
       pollData.options = newOptions.filter(opt => opt.trim());
-      pollData.allowMultiple = allowMultiple;
     } else {
       pollData.options = [];
     }

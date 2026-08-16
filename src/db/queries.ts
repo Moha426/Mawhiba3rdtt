@@ -1148,19 +1148,25 @@ export async function insertPoll(data: any) {
         })
         .returning();
       return inserted[0];
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Poll insertion error (Cloud SQL):", error?.message || error);
       recordDbFailure(error);
     }
   }
 
+  // Ensure we always return a valid poll object even on DB failure
   const newPoll = {
-    id: memoryStore.polls.length > 0 ? Math.max(...memoryStore.polls.map(p => p.id)) + 1 : 1,
+    id: memoryStore.polls.length > 0 ? Math.max(...memoryStore.polls.map(p => p.id)) + 1 : Date.now(),
     ...data,
     question: data.question || "",
     options: data.options ? (typeof data.options === "object" ? JSON.stringify(data.options) : data.options) : "[]",
     totalVotes: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
+    allowMultiple: data.allowMultiple || false,
+    preventWithdraw: data.preventWithdraw || false,
+    isPublic: data.isPublic !== undefined ? data.isPublic : true,
+    status: data.status || "active",
   };
   memoryStore.polls.unshift(newPoll);
   persistStore();
