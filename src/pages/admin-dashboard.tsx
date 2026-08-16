@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { LogOut, BookOpen, Layers, CalendarRange, Users, Shield, SlidersHorizontal, AlertCircle, Clock, Trophy, Download, Upload, CalendarDays, Settings2, Globe, FileText, RefreshCw, CheckCircle2, Languages, Sparkles } from "lucide-react";
+import { LogOut, BookOpen, Layers, CalendarRange, Users, Shield, SlidersHorizontal, AlertCircle, Clock, Trophy, Download, Upload, CalendarDays, Settings2, Globe, FileText, RefreshCw, CheckCircle2, Languages, PieChart } from "lucide-react";
 import { ImportDialog } from "@/components/admin/import-dialog";
 import { AssignmentsTab } from "@/components/admin/assignments-tab";
 import { SubjectsTab } from "@/components/admin/subjects-tab";
@@ -17,9 +17,8 @@ import { PlatformsTab } from "@/components/admin/platforms-tab";
 import { LibraryTab } from "@/components/admin/library-tab";
 import { ChannelsTab } from "@/components/admin/channels-tab";
 import { FlashcardsTab } from "@/components/admin/flashcards-tab";
-import { SuggestionsTab } from "@/components/admin/suggestions-tab";
 import { EscalatedQuestionsTab } from "@/components/admin/escalated-questions-tab";
-import { subscribeToSuggestions } from "@/lib/suggestions";
+import { PollsTab } from "@/components/admin/polls-tab";
 import { motion } from "framer-motion";
 import { useGetDashboardStats, useListStudents, useListQuizzes, exportAllAppData, pushAllLocalDataToCloud } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -36,15 +35,6 @@ export default function AdminDashboard() {
   const { data: stats } = useGetDashboardStats();
   const { data: students = [] } = useListStudents();
   const { data: quizzes = [] } = useListQuizzes();
-  const [pendingSuggestionsCount, setPendingSuggestionsCount] = useState(0);
-
-  useEffect(() => {
-    const unsub = subscribeToSuggestions((list) => {
-      const pending = list.filter((s) => s.status === "pending").length;
-      setPendingSuggestionsCount(pending);
-    });
-    return () => unsub();
-  }, []);
 
   useEffect(() => {
     if (!isAdmin) setLocation("/admin");
@@ -235,14 +225,9 @@ export default function AdminDashboard() {
               <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
               <span>أسئلة الطلاب المستعصية</span>
             </TabsTrigger>
-            <TabsTrigger value="suggestions" className={`${triggerClass} relative`}>
-              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-              <span>اقتراحات الطلاب</span>
-              {pendingSuggestionsCount > 0 && (
-                <span className="mr-1 px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-bold animate-pulse">
-                  {pendingSuggestionsCount}
-                </span>
-              )}
+            <TabsTrigger value="polls" className={triggerClass}>
+              <PieChart className="h-3.5 w-3.5" />
+              <span>نظام التصويت</span>
             </TabsTrigger>
             <TabsTrigger value="events" className={triggerClass}>
               <CalendarDays className="h-3.5 w-3.5" />
@@ -292,8 +277,8 @@ export default function AdminDashboard() {
         <TabsContent value="escalated-questions" className="m-0">
           <EscalatedQuestionsTab />
         </TabsContent>
-        <TabsContent value="suggestions" className="m-0">
-          <SuggestionsTab />
+        <TabsContent value="polls" className="m-0">
+          <PollsTab />
         </TabsContent>
         <TabsContent value="events" className="m-0">
           <EventsTab />

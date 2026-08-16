@@ -20,7 +20,6 @@ import { ar } from "date-fns/locale";
 import { CalendarDays, ChevronRight, ChevronLeft, Palmtree, Star, Flag, Cake, Sun, ClipboardCheck, Clock, Send, Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { StudentSuggestDialog } from "@/components/student-suggest-dialog";
 import { useCompletions } from "@/hooks/use-completions";
 import { useAuth } from "@/lib/auth";
 import { motion } from "framer-motion";
@@ -161,7 +160,6 @@ export default function CalendarPage() {
   }, [selectedDate]);
 
   const isLoading = loadingA || loadingE || loadingQ;
-  const [isSuggestOpen, setIsSuggestOpen] = useState(false);
   if (isLoading) return <LoadingPage />;
 
   return (
@@ -173,21 +171,7 @@ export default function CalendarPage() {
     >
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <PageHeader icon={CalendarDays} title="التقويم الزمني" subtitle="تتبع مهامك القادمة والإجازات والمناسبات" />
-        <Button
-          onClick={() => setIsSuggestOpen(true)}
-          variant="outline"
-          className="rounded-2xl gap-2 font-bold bg-card border-border/70 hover:bg-muted text-foreground h-11 px-4"
-        >
-          <Send className="h-4 w-4 text-primary" />
-          <span>اقتراح أو تصحيح تقويم 💡</span>
-        </Button>
       </div>
-      <StudentSuggestDialog
-        isOpen={isSuggestOpen}
-        onClose={() => setIsSuggestOpen(false)}
-        defaultType="calendar"
-        defaultCategory="التقويم"
-      />
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
         {/* Mini calendar + legend */}

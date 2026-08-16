@@ -10,10 +10,8 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { DEFAULT_FLASHCARDS, type Flashcard } from "@/data/flashcards-data";
 import { getStoredFlashcards, saveStoredFlashcards, deleteStoredFlashcard } from "@/lib/cloud-sync";
-import { submitStudentSuggestion } from "@/lib/suggestions";
 import { useStudentProfile } from "@/lib/use-student-profile";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
-import { StudentSuggestDialog } from "@/components/student-suggest-dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -197,8 +195,7 @@ export default function FlashcardsPage() {
 
   // New Card Form State
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isSuggestOpen, setIsSuggestOpen] = useState(false);
-  const [addMode, setAddMode] = useState<"personal" | "suggest" | "admin">("personal");
+  const [addMode, setAddMode] = useState<"personal" | "admin">("personal");
   const [newCard, setNewCard] = useState<Partial<EnhancedFlashcard>>({
     word: "",
     phonetic: "",
@@ -381,30 +378,6 @@ export default function FlashcardsPage() {
       saveStoredFlashcards([created, ...sharedCards]);
       setSharedCards(prev => [created, ...prev]);
       toast({ title: "تم إضافة البطاقة العامة 🌟", description: `تم نشر بطاقة "${created.word}" لجميع الطلاب.` });
-    } else if (addMode === "suggest") {
-      await submitStudentSuggestion({
-        type: "flashcard",
-        title: `بطاقة: ${wordVal}`,
-        category: categoryVal,
-        description: `المعنى: ${meaningVal}`,
-        data: {
-          word: wordVal,
-          phonetic: phoneticVal,
-          partOfSpeech: partOfSpeechVal,
-          meaningAr: meaningVal,
-          exampleEn: exampleEnVal,
-          exampleAr: exampleArVal,
-          category: categoryVal,
-          difficulty: difficultyVal,
-        },
-        studentId: profile?.id || 1,
-        studentName: profile?.name || "طالب",
-        studentUsername: profile?.username,
-      });
-      toast({
-        title: "تم إرسال الاقتراح للمشرف 🚀",
-        description: `تم إرسال بطاقة "${wordVal}" للمشرف لمراجعتها والموافقة عليها.`,
-      });
     } else {
       // Personal for student only
       const created: EnhancedFlashcard = {
@@ -1178,25 +1151,11 @@ export default function FlashcardsPage() {
               <Sparkles className="h-4 w-4 text-amber-500" />
               <span>توليد بالذكاء الاصطناعي</span>
             </Button>
-            <Button
-              onClick={() => setIsSuggestOpen(true)}
-              variant="outline"
-              className="rounded-xl h-10 gap-2 text-xs font-bold bg-background/90 hover:bg-muted border-border/70 text-foreground"
-            >
-              <Send className="h-4 w-4 text-indigo-500" />
-              <span>اقتراح أو تصحيح</span>
-            </Button>
-            <StudentSuggestDialog
-              isOpen={isSuggestOpen}
-              onClose={() => setIsSuggestOpen(false)}
-              defaultType="flashcard"
-              defaultCategory="أكاديمي وSTEP"
-            />
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
                 <Button className="rounded-xl h-10 gap-2 text-xs font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md hover:shadow-indigo-500/25 transition-all">
                   <Plus className="h-4 w-4" />
-                  <span>{isAdmin ? "إضافة بطاقة" : "إضافة / اقتراح"}</span>
+                  <span>{isAdmin ? "إضافة بطاقة" : "إضافة بطاقة جديدة"}</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[480px] rounded-3xl" dir="rtl">
@@ -1208,38 +1167,20 @@ export default function FlashcardsPage() {
                 </DialogHeader>
 
                 {/* Mode Selector for Students */}
-                {!isAdmin && (
-                  <div className="grid grid-cols-2 gap-2 p-1 bg-muted/60 rounded-2xl border border-border/40 text-xs">
+                {isAdmin && (
+                  <div className="flex p-1 bg-muted/60 rounded-2xl border border-border/40 text-xs mb-3">
                     <button
                       type="button"
-                      onClick={() => setAddMode("personal")}
-                      className={`py-2 px-3 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 ${
-                        addMode === "personal"
+                      onClick={() => setAddMode("admin")}
+                      className={`w-full py-2 px-3 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        addMode === "admin"
                           ? "bg-indigo-600 text-white shadow-xs"
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      <UserCheck className="h-3.5 w-3.5" />
-                      <span>بطاقتي الخاصة (لي فقط)</span>
+                      <Shield className="h-3.5 w-3.5" />
+                      <span>إضافة بطاقة للمنصة (عامة)</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setAddMode("suggest")}
-                      className={`py-2 px-3 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 ${
-                        addMode === "suggest"
-                          ? "bg-purple-600 text-white shadow-xs"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <Send className="h-3.5 w-3.5" />
-                      <span>اقتراح نشر للمشرف 🚀</span>
-                    </button>
-                  </div>
-                )}
-
-                {addMode === "suggest" && !isAdmin && (
-                  <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs leading-relaxed">
-                    ✨ سيتم إرسال الكلمة للمشرف لمراجعتها والموافقة على نشرها لجميع زملائك في المنصة.
                   </div>
                 )}
 
@@ -1322,7 +1263,7 @@ export default function FlashcardsPage() {
                   </div>
 
                   <Button type="submit" className="w-full rounded-2xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white py-2.5">
-                    {isAdmin ? "حفظ ونشر البطاقة" : addMode === "suggest" ? "إرسال الاقتراح للمشرف" : "حفظ في بطاقاتي الخاصة"}
+                    {isAdmin ? "حفظ ونشر البطاقة" : "حفظ في بطاقاتي الخاصة"}
                   </Button>
                 </form>
               </DialogContent>

@@ -27,10 +27,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { StudentSuggestDialog } from "@/components/student-suggest-dialog";
 import { usePersistentState } from "@/lib/api-client-react";
 import { DEFAULT_COMMUNITY_CHANNELS, type CommunityChannel } from "@/components/admin/channels-tab";
-import { DownloadAppModal } from "@/components/download-app-modal";
 import {
   Dialog,
   DialogContent,
@@ -60,7 +58,6 @@ export default function ChannelsPage() {
 
   // Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isSuggestOpen, setIsSuggestOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<CommunityChannel | null>(null);
   const [formName, setFormName] = useState("");
   const [formType, setFormType] = useState<CommunityChannel["type"]>("discord");
@@ -75,7 +72,6 @@ export default function ChannelsPage() {
   // PWA Install State
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
-  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   useEffect(() => {
     if (window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone) {
@@ -253,21 +249,6 @@ export default function ChannelsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <Button
-            onClick={() => setIsSuggestOpen(true)}
-            variant="outline"
-            className="h-11 px-4 rounded-2xl font-bold gap-2 border-border/70 bg-card hover:bg-muted text-foreground shadow-sm"
-          >
-            <Send className="h-4 w-4 text-primary" />
-            <span>اقتراح قناة جديدة 💡</span>
-          </Button>
-          <StudentSuggestDialog
-            isOpen={isSuggestOpen}
-            onClose={() => setIsSuggestOpen(false)}
-            defaultType="general"
-            defaultCategory="قنوات وتواصل"
-          />
-
           {isAdmin && (
             <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
               <DialogTrigger asChild>
@@ -620,11 +601,9 @@ export default function ChannelsPage() {
         <div className="text-center py-16 bg-card/40 rounded-3xl border border-dashed border-border/80">
           <MessageSquare className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
           <h3 className="font-bold text-lg text-foreground">لا توجد قنوات تطابق بحثك</h3>
-          <p className="text-xs text-muted-foreground mt-1">جرّب تغيير عبارة البحث أو إرسال اقتراح قناة جديدة</p>
+          <p className="text-xs text-muted-foreground mt-1">جرّب تغيير عبارة البحث</p>
         </div>
       )}
-
-      <DownloadAppModal isOpen={isDownloadModalOpen} onClose={() => setIsDownloadModalOpen(false)} />
     </div>
   );
 }

@@ -16,7 +16,6 @@ import {
   getStoredPlatforms,
   saveStoredPlatforms,
 } from "@/lib/cloud-sync";
-import { StudentSuggestDialog } from "@/components/student-suggest-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePersistentState } from "@/lib/api-client-react";
 
@@ -583,7 +582,6 @@ export default function PlatformsPage() {
   const [browserInput, setBrowserInput] = useState("");
   const [searchType, setSearchType] = useState<"all" | "videos" | "questions">("all");
   const [syncedRoomTabs, setSyncedRoomTabs] = useState<any | null>(null);
-  const [showSuggestDialog, setShowSuggestDialog] = useState(false);
 
   // Listen to shared tab events from chat or other components
   useEffect(() => {
@@ -765,17 +763,6 @@ export default function PlatformsPage() {
                   تصفح
                 </Button>
               </form>
-            </div>
-
-            {/* Student Suggestion Action */}
-            <div className="shrink-0 self-start md:self-center">
-              <Button
-                onClick={() => setShowSuggestDialog(true)}
-                className="rounded-2xl h-11 px-5 font-bold text-xs gap-2 bg-primary text-primary-foreground shadow-lg hover:shadow-primary/25 hover:scale-[1.02] transition-all"
-              >
-                <Sparkles className="h-4 w-4" />
-                <span>اقترح منصة أو موقع تعليمي 💡</span>
-              </Button>
             </div>
           </div>
         </div>
@@ -1421,14 +1408,6 @@ export default function PlatformsPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Student Suggestion Dialog */}
-      <StudentSuggestDialog
-        isOpen={showSuggestDialog}
-        onClose={() => setShowSuggestDialog(false)}
-        defaultType="platform"
-        defaultCategory={selectedCategory === "الكل" ? "منصة تعليمية" : selectedCategory}
-      />
     </div>
   );
 }

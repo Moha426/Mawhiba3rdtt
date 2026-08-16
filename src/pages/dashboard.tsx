@@ -9,6 +9,7 @@ import {
   Bot, FolderDown, BrainCircuit, FileSpreadsheet, GraduationCap, Languages,
   MessageSquare, Smartphone
 } from "lucide-react";
+import { PollsSection } from "@/components/polls-section";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -257,6 +258,11 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
+      {/* ── Polls & Voting Section ── */}
+      <motion.div variants={fadeUp}>
+        <PollsSection />
+      </motion.div>
+
       {/* ── Today schedule ── */}
       <motion.div variants={fadeUp}>
         <TodayScheduleCard />
@@ -435,7 +441,6 @@ export default function Dashboard() {
           </motion.div>
         </Link>
       </motion.div>
-
 
       {/* ── Upcoming assignments & Countdown ── */}
       <motion.div variants={fadeUp} className="space-y-3">

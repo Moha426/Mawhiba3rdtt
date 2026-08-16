@@ -10,7 +10,6 @@ import { PageHeader } from "@/components/page-header";
 import { LoadingPage } from "@/components/loading-state";
 import { ASSIGNMENT_TYPE_LABELS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
-import { StudentSuggestDialog } from "@/components/student-suggest-dialog";
 import {
   Select,
   SelectContent,
@@ -119,7 +118,6 @@ export default function Assignments() {
   const [selectedType, setSelectedType] = useState<string>("__all__");
   const [sortKey, setSortKey] = useState<SortKey>("auto");
   const [hideCompleted, setHideCompleted] = useState(false);
-  const [isSuggestOpen, setIsSuggestOpen] = useState(false);
 
   const { completedIds, toggle } = useCompletions();
   const { isSignedIn } = useAuth();
@@ -172,21 +170,7 @@ export default function Assignments() {
       {/* ── Header ── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <PageHeader icon={BookOpen} title="جميع المهام" subtitle="استعرض كافة الواجبات والمشاريع والاختبارات والملفات" />
-        <Button
-          onClick={() => setIsSuggestOpen(true)}
-          variant="outline"
-          className="rounded-2xl gap-2 font-bold bg-card border-border/70 hover:bg-muted text-foreground h-11 px-4"
-        >
-          <Send className="h-4 w-4 text-primary" />
-          <span>اقتراح أو تصحيح مهمة 💡</span>
-        </Button>
       </div>
-      <StudentSuggestDialog
-        isOpen={isSuggestOpen}
-        onClose={() => setIsSuggestOpen(false)}
-        defaultType="assignment"
-        defaultCategory="المهام"
-      />
 
       {/* ── Search bar ── */}
       <div className="relative">

@@ -5,7 +5,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { StudentSuggestDialog } from "@/components/student-suggest-dialog";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 
@@ -120,7 +119,6 @@ export default function Schedule() {
 
   const todayDayId = getTodayDayId(now);
   const [selectedDay, setSelectedDay] = useState<number>(todayDayId);
-  const [isSuggestOpen, setIsSuggestOpen] = useState(false);
 
   if (slotsLoading || configLoading) return <LoadingPage />;
 
@@ -188,21 +186,7 @@ export default function Schedule() {
             </Badge>
           </div>
         </PageHeader>
-        <Button
-          onClick={() => setIsSuggestOpen(true)}
-          variant="outline"
-          className="rounded-2xl gap-2 font-bold bg-card border-border/70 hover:bg-muted text-foreground h-11 px-4"
-        >
-          <Send className="h-4 w-4 text-primary" />
-          <span>اقتراح تعديل جدول 💡</span>
-        </Button>
       </div>
-      <StudentSuggestDialog
-        isOpen={isSuggestOpen}
-        onClose={() => setIsSuggestOpen(false)}
-        defaultType="schedule"
-        defaultCategory="الجدول"
-      />
 
       {slots.length === 0 && (
         <Alert className="bg-muted/50 border-dashed">

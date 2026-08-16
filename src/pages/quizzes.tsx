@@ -7,7 +7,6 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, Clock, ChevronLeft, Trophy, HelpCircle, Sparkles, Search, X, ExternalLink, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StudentSuggestDialog } from "@/components/student-suggest-dialog";
 
 const stagger = {
   hidden: { opacity: 0 },
@@ -22,7 +21,6 @@ export default function QuizzesPage() {
   const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [showSuggestDialog, setShowSuggestDialog] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -67,13 +65,6 @@ export default function QuizzesPage() {
           title="الاختبارات التفاعلية"
           subtitle={totalQuizzes > 0 ? `${totalQuizzes} اختبار متاح` : "اختبر معلوماتك في جميع المواد"}
         />
-        <Button
-          onClick={() => setShowSuggestDialog(true)}
-          className="rounded-2xl h-11 px-5 font-bold text-xs gap-2 bg-primary text-primary-foreground shadow-md hover:scale-[1.02] transition-all shrink-0 self-start sm:self-center"
-        >
-          <Sparkles className="h-4 w-4" />
-          <span>اقترح إضافة اختبار جديد 💡</span>
-        </Button>
       </div>
 
       {/* ── Search bar ── */}
@@ -175,14 +166,6 @@ export default function QuizzesPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Student Suggestion Dialog */}
-      <StudentSuggestDialog
-        isOpen={showSuggestDialog}
-        onClose={() => setShowSuggestDialog(false)}
-        defaultType="quiz"
-        defaultCategory="قدرات"
-      />
     </motion.div>
   );
 }

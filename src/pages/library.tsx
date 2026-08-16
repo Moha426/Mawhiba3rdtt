@@ -25,7 +25,6 @@ import {
   getLibraryCategories,
   type StudyFile 
 } from "@/lib/cloud-sync";
-import { StudentSuggestDialog } from "@/components/student-suggest-dialog";
 import { useToast } from "@/hooks/use-toast";
 
 export default function LibraryPage() {
@@ -36,7 +35,6 @@ export default function LibraryPage() {
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [loading, setLoading] = useState(true);
   const [previewFile, setPreviewFile] = useState<StudyFile | null>(null);
-  const [showSuggestDialog, setShowSuggestDialog] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -84,17 +82,6 @@ export default function LibraryPage() {
             <p className="text-sm text-muted-foreground leading-relaxed">
               تصفّح وحمّل أحدث تجميعات 1445-1446، خرائط المفاهيم، وشيتات القوانين المعتمدة للقدرات والتحصيلي.
             </p>
-          </div>
-
-          {/* Student Suggestion Action */}
-          <div className="shrink-0">
-            <Button
-              onClick={() => setShowSuggestDialog(true)}
-              className="rounded-2xl h-11 px-5 font-bold text-xs gap-2 bg-primary text-primary-foreground shadow-lg hover:shadow-primary/25 hover:scale-[1.02] transition-all"
-            >
-              <Sparkles className="h-4 w-4" />
-              <span>اقترح إضافة ملف أو تجميعة 💡</span>
-            </Button>
           </div>
         </div>
       </div>
@@ -361,14 +348,6 @@ export default function LibraryPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Student Suggestion Dialog */}
-      <StudentSuggestDialog
-        isOpen={showSuggestDialog}
-        onClose={() => setShowSuggestDialog(false)}
-        defaultType="file"
-        defaultCategory={selectedCategory === "الكل" ? "تجميعات" : selectedCategory}
-      />
     </div>
   );
 }
