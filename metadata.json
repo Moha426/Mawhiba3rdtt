@@ -1,0 +1,6 @@
+{
+  "name": "لوحة التحكم المدرسية والغرف الدراسية",
+  "description": "منصة تعليمية متكاملة لطلاب ثالث موهبة تضم بوابة القنوات وخوادم ديسكورد، المعلم الذكي مع تصعيد المسائل للمعلمين، ومكتبة التجميعات والبطاقات التفاعلية",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

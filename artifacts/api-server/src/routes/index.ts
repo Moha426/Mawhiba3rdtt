@@ -1,0 +1,46 @@
+import { Router, type IRouter } from "express";
+import healthRouter from "./health";
+import authRouter from "./auth";
+import studentAuthRouter from "./student-auth";
+import studentsRouter from "./students";
+import subjectsRouter from "./subjects";
+import assignmentsRouter from "./assignments";
+import completionsRouter from "./completions";
+import scheduleRouter from "./schedule";
+import scheduleConfigRouter from "./schedule-config";
+import dashboardRouter from "./dashboard";
+import storageRouter from "./storage";
+import quizzesRouter from "./quizzes";
+import exportRouter from "./export";
+import eventsRouter from "./events";
+import settingsRouter from "./settings";
+import notesRouter from "./notes";
+import chatRouter from "./chat";
+import roomsRouter from "./rooms";
+import pointsRouter from "./points";
+import resourceSectionsRouter from "./resource-sections";
+
+const router: IRouter = Router();
+
+router.use(healthRouter);
+router.use(authRouter);
+router.use(studentAuthRouter);
+router.use(studentsRouter);
+router.use(subjectsRouter);
+router.use(assignmentsRouter);
+router.use(completionsRouter);
+router.use(scheduleConfigRouter);
+router.use(scheduleRouter);
+router.use(dashboardRouter);
+router.use(storageRouter);
+router.use(quizzesRouter);
+router.use(exportRouter);
+router.use(eventsRouter);
+router.use(settingsRouter);
+router.use(notesRouter);
+router.use(chatRouter);
+router.use(roomsRouter);
+router.use(pointsRouter);
+router.use(resourceSectionsRouter);
+
+export default router;

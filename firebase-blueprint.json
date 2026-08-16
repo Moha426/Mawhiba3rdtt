@@ -1,0 +1,78 @@
+{
+  "collections": [
+    {
+      "name": "users",
+      "documentSchema": {
+        "name": "string",
+        "createdAt": "timestamp"
+      },
+      "rules": {
+        "read": "request.auth != null",
+        "create": "request.auth != null && request.auth.uid == documentId",
+        "update": "request.auth != null && request.auth.uid == documentId",
+        "delete": "false"
+      }
+    },
+    {
+      "name": "tasks",
+      "documentSchema": {
+        "userId": "string",
+        "title": "string",
+        "completed": "boolean",
+        "createdAt": "timestamp"
+      },
+      "rules": {
+        "read": "request.auth != null && resource.data.userId == request.auth.uid",
+        "create": "request.auth != null && request.resource.data.userId == request.auth.uid",
+        "update": "request.auth != null && resource.data.userId == request.auth.uid",
+        "delete": "request.auth != null && resource.data.userId == request.auth.uid"
+      }
+    },
+    {
+      "name": "files",
+      "documentSchema": {
+        "userId": "string",
+        "title": "string",
+        "url": "string",
+        "type": "string",
+        "createdAt": "timestamp"
+      },
+      "rules": {
+        "read": "request.auth != null",
+        "create": "request.auth != null && request.resource.data.userId == request.auth.uid",
+        "update": "request.auth != null && resource.data.userId == request.auth.uid",
+        "delete": "request.auth != null && resource.data.userId == request.auth.uid"
+      }
+    },
+    {
+      "name": "notifications",
+      "documentSchema": {
+        "userId": "string",
+        "title": "string",
+        "body": "string",
+        "read": "boolean",
+        "createdAt": "timestamp"
+      },
+      "rules": {
+        "read": "request.auth != null && resource.data.userId == request.auth.uid",
+        "create": "request.auth != null",
+        "update": "request.auth != null && resource.data.userId == request.auth.uid",
+        "delete": "request.auth != null && resource.data.userId == request.auth.uid"
+      }
+    },
+    {
+      "name": "chat_messages",
+      "documentSchema": {
+        "userId": "string",
+        "content": "string",
+        "createdAt": "timestamp"
+      },
+      "rules": {
+        "read": "request.auth != null",
+        "create": "request.auth != null && request.resource.data.userId == request.auth.uid",
+        "update": "request.auth != null && resource.data.userId == request.auth.uid",
+        "delete": "request.auth != null && resource.data.userId == request.auth.uid"
+      }
+    }
+  ]
+}

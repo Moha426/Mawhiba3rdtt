@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 260" width="100%" height="100%" fill="none" stroke="currentColor">
+  <defs>
+    <filter id="subtle-glow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="currentColor" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  
+  <g class="logo-mark" filter="url(#subtle-glow)">
+    <!-- Right side: Leaf / Badge Emblem containing the number 2 -->
+    <g transform="translate(530, 20)">
+      <!-- Leaf Container Outline -->
+      <path 
+        d="M 25 10 
+           C 70 10, 190 20, 205 95 
+           C 215 150, 185 200, 130 215 
+           C 70 225, 25 215, 10 215 
+           C 10 215, 10 20, 25 10 Z" 
+        stroke="currentColor" 
+        stroke-width="7.5" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+        fill="none"
+      />
+      
+      <!-- Bold Number 2 Inside Badge -->
+      <path 
+        d="M 58 68 
+           C 58 45, 82 32, 115 32 
+           C 148 32, 172 48, 172 74 
+           C 172 102, 142 128, 108 152 
+           L 174 152 
+           L 174 182 
+           L 55 182 
+           L 55 158 
+           C 85 130, 122 102, 128 82 
+           C 131 72, 125 60, 112 60 
+           C 98 60, 92 70, 88 80 
+           Z" 
+        fill="currentColor"
+        stroke="currentColor"
+        stroke-width="2"
+      />
+    </g>
+
+    <!-- Left side: "ثاني موهبة" Typography -->
+    <g transform="translate(20, 20)">
+      <!-- Word 1 (Top): ثاني -->
+      <g>
+        <!-- 3 dots above 'ث' (triad) -->
+        <circle cx="468" cy="22" r="10" fill="currentColor" />
+        <circle cx="452" cy="46" r="10" fill="currentColor" />
+        <circle cx="484" cy="46" r="10" fill="currentColor" />
+
+        <!-- Letter 'ث' + 'ا' + 'ن' + 'ي' connected calligraphic path -->
+        <path 
+          d="M 490 72 
+             C 475 72, 462 78, 455 92 
+             C 448 80, 435 72, 415 72 
+             L 320 72 
+             C 315 72, 310 68, 310 50 
+             L 310 18 
+             L 282 18 
+             L 282 62 
+             C 282 86, 260 92, 235 92 
+             C 200 92, 175 75, 140 75 
+             C 105 75, 85 105, 85 125 
+             C 85 142, 102 152, 122 152 
+             C 152 152, 175 132, 205 132 
+             C 225 132, 238 140, 255 140 
+             L 315 140 
+             C 328 140, 338 132, 342 120 
+             L 475 120 
+             C 492 120, 502 108, 502 96 
+             C 502 82, 498 72, 490 72 Z" 
+          stroke="currentColor" 
+          stroke-width="7" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          fill="none"
+        />
+
+        <!-- 2 dots below 'ي' / 'ثاني' -->
+        <circle cx="160" cy="180" r="10" fill="currentColor" />
+        <circle cx="128" cy="180" r="10" fill="currentColor" />
+      </g>
+
+      <!-- Word 2 (Bottom): موهبة -->
+      <g transform="translate(0, 50)">
+        <!-- 2 dots above 'ة' -->
+        <circle cx="488" cy="85" r="9.5" fill="currentColor" />
+        <circle cx="462" cy="85" r="9.5" fill="currentColor" />
+
+        <!-- 1 dot below 'ب' -->
+        <circle cx="178" cy="210" r="9.5" fill="currentColor" />
+
+        <!-- Connected Letters for موهبة -->
+        <path 
+          d="M 505 135 
+             C 505 115, 485 105, 465 105 
+             C 440 105, 420 120, 410 135 
+             C 395 120, 375 110, 350 110 
+             C 320 110, 298 128, 288 145 
+             C 275 130, 252 118, 225 118 
+             C 195 118, 175 135, 162 152 
+             L 115 152 
+             C 95 152, 85 140, 85 125 
+             C 85 105, 102 95, 120 95 
+             C 138 95, 150 105, 150 118 
+             L 165 118 
+             C 165 92, 140 75, 115 75 
+             C 75 75, 55 102, 55 130 
+             C 55 160, 80 178, 115 178 
+             L 175 178 
+             C 192 178, 208 168, 220 152 
+             C 232 168, 250 178, 275 178 
+             C 305 178, 330 162, 342 145 
+             C 355 165, 378 178, 410 178 
+             C 440 178, 465 162, 475 148 
+             L 485 148 
+             C 498 148, 505 142, 505 135 Z" 
+          stroke="currentColor" 
+          stroke-width="7" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          fill="none"
+        />
+      </g>
+    </g>
+  </g>
+</svg>

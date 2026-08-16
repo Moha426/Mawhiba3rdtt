@@ -1,0 +1,54 @@
+{
+  "id": "sa.edu.talented.thirdgrade.app",
+  "name": "منصة ثالث ثانوي موهبة",
+  "short_name": "ثالث موهبة",
+  "description": "منصة دراسية ذكية وتطبيق تعليمي متكامل لطلاب ثالث ثانوي موهبة يضم المعلم الذكي، التجميعات، القنوات، والاختبارات",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#090d16",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "lang": "ar",
+  "dir": "rtl",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/assets/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "بوابة القنوات",
+      "short_name": "القنوات",
+      "description": "الانضمام لقنوات ديسكورد وتليجرام",
+      "url": "/channels",
+      "icons": [{ "src": "/assets/logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "المعلم الذكي",
+      "short_name": "المعلم الذكي",
+      "description": "حل المسائل والكويزات الفورية",
+      "url": "/ai-tutor",
+      "icons": [{ "src": "/assets/logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "مكتبة التجميعات",
+      "short_name": "المكتبة",
+      "description": "تصفح ملخصات وتجميعات قياس",
+      "url": "/library",
+      "icons": [{ "src": "/assets/logo.png", "sizes": "192x192" }]
+    }
+  ]
+}
+
