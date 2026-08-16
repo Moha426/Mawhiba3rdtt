@@ -1133,7 +1133,8 @@ export async function insertPoll(data: any) {
   const dbInstance = getDb();
   if (dbInstance) {
     try {
-      const inserted = await dbInstance
+      // Add a 3-second timeout to DB operation to prevent hanging on unreachable databases
+      const dbPromise = dbInstance
         .insert(polls)
         .values({
           question: data.question || "",
@@ -1144,13 +1145,22 @@ export async function insertPoll(data: any) {
           isPublic: data.isPublic !== undefined ? data.isPublic : true,
           allowMultiple: data.allowMultiple || false,
           preventWithdraw: data.preventWithdraw || false,
-          expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+          expiresAt: (data.expiresAt && !isNaN(new Date(data.expiresAt).getTime())) ? new Date(data.expiresAt) : null,
         })
         .returning();
-      return inserted[0];
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Database operation timed out")), 3000)
+      );
+
+      const inserted = await Promise.race([dbPromise, timeoutPromise]) as any[];
+      if (inserted && inserted.length > 0) {
+        return inserted[0];
+      }
     } catch (error: any) {
       console.error("Poll insertion error (Cloud SQL):", error?.message || error);
       recordDbFailure(error);
+      // Continue to memory fallback
     }
   }
 

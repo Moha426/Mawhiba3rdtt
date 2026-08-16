@@ -51,14 +51,19 @@ export async function createPoll(data: Partial<Poll>): Promise<Poll | null> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error("Failed to create poll");
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || `خطأ في الخادم: ${res.status}`);
+    }
     const p = await res.json();
     return {
       ...p,
       options: typeof p.options === "string" ? JSON.parse(p.options) : (p.options || [])
     };
-  } catch (err) {
-    console.error(err);
+  } catch (err: any) {
+    console.error("Create poll error details:", err);
+    // Return a dummy object if needed or propagate the error message
+    // For now, let's throw so the UI can catch it or return null with console log
     return null;
   }
 }

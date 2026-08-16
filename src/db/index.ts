@@ -33,10 +33,10 @@ export const createPool = (): Pool | null => {
       ? {
           connectionString: DATABASE_URL,
           max: 10,
-          connectionTimeoutMillis: 5000,
-          ssl: DATABASE_URL.includes("neon.tech") || DATABASE_URL.includes("supabase.co") || DATABASE_URL.includes("vercel-storage.com")
-            ? { rejectUnauthorized: false }
-            : false,
+          connectionTimeoutMillis: 10000,
+          ssl: DATABASE_URL.includes("localhost") || DATABASE_URL.includes("127.0.0.1")
+            ? false
+            : { rejectUnauthorized: false },
         }
       : {
           host: SQL_HOST,
@@ -44,7 +44,7 @@ export const createPool = (): Pool | null => {
           password: SQL_PASSWORD,
           database: SQL_DB_NAME,
           max: 10,
-          connectionTimeoutMillis: 5000,
+          connectionTimeoutMillis: 10000,
         };
 
     const newPool = new Pool(poolConfig);
