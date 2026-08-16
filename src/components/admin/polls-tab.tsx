@@ -316,20 +316,18 @@ export function PollsTab() {
               )}
 
               <div className="flex flex-wrap items-center gap-4 px-1">
-                {pollType === "choice" && (
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="checkbox" 
-                      id="allowMultiple" 
-                      checked={allowMultiple} 
-                      onChange={(e) => setAllowMultiple(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <label htmlFor="allowMultiple" className="text-xs font-bold text-muted-foreground cursor-pointer">
-                      السماح باختيار أكثر من خيار
-                    </label>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="allowMultiple" 
+                    checked={allowMultiple} 
+                    onChange={(e) => setAllowMultiple(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="allowMultiple" className="text-xs font-bold text-muted-foreground cursor-pointer">
+                    {pollType === "choice" ? "السماح باختيار أكثر من خيار" : "السماح بإرسال أكثر من إجابة نصية"}
+                  </label>
+                </div>
                 <div className="flex items-center gap-2">
                   <input 
                     type="checkbox" 

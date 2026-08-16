@@ -60,7 +60,7 @@ function PollCard({
   const [voterName, setVoterName] = useState(initialStudentName);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const hasVoted = votedValue !== undefined;
+  const hasVoted = votedValue !== undefined && !(poll.type === "text" && poll.allowMultiple);
   const options = Array.isArray(poll.options) ? poll.options : JSON.parse(poll.options as string);
   
   const results = poll.type === "choice" ? options.map((opt: string, index: number) => {
@@ -95,6 +95,9 @@ function PollCard({
       name: voterName.trim() 
     });
     setIsSubmitting(false);
+    if (poll.type === "text" && poll.allowMultiple) {
+      setTextAnswer("");
+    }
   };
 
   const isUserChoice = (index: number) => {
@@ -203,12 +206,26 @@ function PollCard({
                 <p className="text-sm font-bold leading-relaxed">{String(votedValue)}</p>
               </div>
             ) : (
-              <textarea
-                value={textAnswer}
-                onChange={(e) => setTextAnswer(e.target.value)}
-                placeholder="اكتب إجابتك هنا..."
-                className="w-full p-4 rounded-2xl bg-muted/30 border-none focus:ring-2 focus:ring-primary/20 text-sm font-bold min-h-[100px] resize-none"
-              />
+              <div className="space-y-4">
+                {poll.allowMultiple && Array.isArray(votedValue) && votedValue.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-primary">إجاباتك السابقة:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {votedValue.map((v, idx) => (
+                        <div key={idx} className="px-3 py-1.5 bg-primary/5 border border-primary/20 rounded-xl text-[11px] font-bold">
+                          {v}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <textarea
+                  value={textAnswer}
+                  onChange={(e) => setTextAnswer(e.target.value)}
+                  placeholder="اكتب إجابتك هنا..."
+                  className="w-full p-4 rounded-2xl bg-muted/30 border-none focus:ring-2 focus:ring-primary/20 text-sm font-bold min-h-[100px] resize-none"
+                />
+              </div>
             )}
           </div>
         )}
@@ -362,7 +379,18 @@ export function PollsSection() {
     }
 
     if (success) {
-      const voteValue = poll.type === "text" ? data.text! : (poll.allowMultiple ? data.indices! : data.indices![0]);
+      let voteValue;
+      if (poll.type === "text") {
+        if (poll.allowMultiple) {
+          const current = Array.isArray(votedPolls[pollId]) ? votedPolls[pollId] : (votedPolls[pollId] ? [votedPolls[pollId]] : []);
+          voteValue = [...current, data.text!];
+        } else {
+          voteValue = data.text!;
+        }
+      } else {
+        voteValue = poll.allowMultiple ? data.indices! : data.indices![0];
+      }
+      
       const updatedVotes = { ...votedPolls, [pollId]: voteValue };
       setVotedPolls(updatedVotes);
       localStorage.setItem("student_votes_v3", JSON.stringify(updatedVotes));

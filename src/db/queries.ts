@@ -1136,8 +1136,8 @@ export async function insertPoll(data: any) {
       const inserted = await dbInstance
         .insert(polls)
         .values({
-          question: data.question,
-          options: typeof data.options === "object" ? JSON.stringify(data.options) : data.options,
+          question: data.question || "",
+          options: data.options ? (typeof data.options === "object" ? JSON.stringify(data.options) : data.options) : "[]",
           status: data.status || "active",
           type: data.type || "choice",
           imageUrl: data.imageUrl || null,
@@ -1156,7 +1156,8 @@ export async function insertPoll(data: any) {
   const newPoll = {
     id: memoryStore.polls.length > 0 ? Math.max(...memoryStore.polls.map(p => p.id)) + 1 : 1,
     ...data,
-    options: typeof data.options === "object" ? JSON.stringify(data.options) : data.options,
+    question: data.question || "",
+    options: data.options ? (typeof data.options === "object" ? JSON.stringify(data.options) : data.options) : "[]",
     totalVotes: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -1179,7 +1180,7 @@ export async function updatePoll(id: number, updates: any) {
       if (updates.allowMultiple !== undefined) cleanUpdates.allowMultiple = updates.allowMultiple;
       if (updates.preventWithdraw !== undefined) cleanUpdates.preventWithdraw = updates.preventWithdraw;
       if (updates.options !== undefined) {
-        cleanUpdates.options = typeof updates.options === "object" ? JSON.stringify(updates.options) : updates.options;
+        cleanUpdates.options = updates.options ? (typeof updates.options === "object" ? JSON.stringify(updates.options) : updates.options) : "[]";
       }
       if (updates.totalVotes !== undefined) cleanUpdates.totalVotes = updates.totalVotes;
       if (updates.expiresAt !== undefined) cleanUpdates.expiresAt = updates.expiresAt ? new Date(updates.expiresAt) : null;
