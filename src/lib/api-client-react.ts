@@ -141,6 +141,12 @@ export function usePersistentState<T>(key: string, initialValue: T): [T, (val: T
         window.dispatchEvent(new CustomEvent("channels_storage_change", { detail: { channels: next } }));
       }
     } catch {}
+
+    // IMPORTANT: Actually push to Firebase Firestore here so changes persist!
+    safeFirestoreWrite(async () => {
+      const docRef = doc(db, "app_data", key);
+      await setDoc(docRef, { value: next, updatedAt: serverTimestamp() }, { merge: true });
+    });
     
     window.dispatchEvent(new CustomEvent("app_data_change", { detail: { key, value: next } }));
     setState(next);

@@ -18,6 +18,7 @@ import { useStudentProfile } from "@/lib/use-student-profile";
 import { AppLogo } from "@/components/app-logo";
 import { getStoredPlatforms } from "@/lib/cloud-sync";
 import { DEFAULT_PLATFORMS } from "./platforms";
+import { PollsSection } from "@/components/polls-section";
 import {
   motion,
   useMotionValue,
@@ -525,6 +526,11 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground/60">لقد أنجزت جميع مهامك. أحسنت صنعاً!</p>
           </motion.div>
         )}
+      </motion.div>
+
+      {/* ── Polls & Voting Section ── */}
+      <motion.div variants={fadeUp} className="pt-2">
+        <PollsSection />
       </motion.div>
 
       {/* ── Quick Platforms & Resources Strip ── */}

@@ -29,6 +29,16 @@ import {
   insertSuggestion,
   updateSuggestion,
   deleteSuggestion,
+  getAllPolls,
+  getPollById,
+  insertPoll,
+  updatePoll,
+  deletePoll,
+  getPollVotes,
+  submitVote,
+  withdrawVote,
+  syncPollVotes,
+  loadMemoryStoreFromFirestore, // we will add this
 } from "./src/db/queries";
 import { 
   solveProblemWithGemini, 
@@ -57,6 +67,11 @@ async function startServer() {
       }
     }
     firestoreDb = admin.firestore();
+    
+    // Load backend data if Cloud SQL is missing
+    if (!isCloudSqlConfigured()) {
+      await loadMemoryStoreFromFirestore(firestoreDb);
+    }
   } catch (err) {
     console.warn("Failed to initialize Firebase Admin, falling back to server memory:", err);
   }
@@ -510,6 +525,96 @@ async function startServer() {
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to delete suggestion" });
+    }
+  });
+
+  // ================= POLLS & VOTING ENDPOINTS =================
+  app.get("/api/polls", async (_req, res) => {
+    try {
+      const list = await getAllPolls();
+      res.json(list);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to fetch polls" });
+    }
+  });
+
+  app.post("/api/polls", async (req, res) => {
+    try {
+      const created = await insertPoll(req.body);
+      res.json(created);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to create poll" });
+    }
+  });
+
+  app.put("/api/polls/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const updated = await updatePoll(id, req.body);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to update poll" });
+    }
+  });
+
+  app.delete("/api/polls/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      await deletePoll(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to delete poll" });
+    }
+  });
+
+  app.get("/api/polls/:id/votes", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const votes = await getPollVotes(id);
+      res.json(votes);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to fetch votes" });
+    }
+  });
+
+  app.post("/api/polls/:id/vote", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const result = await submitVote({
+        pollId: id,
+        userId: req.body.userId,
+        userName: req.body.userName,
+        optionIndex: req.body.optionIndex,
+        textAnswer: req.body.textAnswer,
+        ratingValue: req.body.ratingValue,
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || "Failed to submit vote" });
+    }
+  });
+
+  app.post("/api/polls/:id/withdraw", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const userId = req.body.userId;
+      if (!userId) {
+        return res.status(400).json({ error: "معرف المستخدم مطلوب" });
+      }
+      const result = await withdrawVote(id, userId);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || "Failed to withdraw vote" });
+    }
+  });
+
+  app.post("/api/polls/:id/sync", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const result = await syncPollVotes(id);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to sync poll" });
     }
   });
 

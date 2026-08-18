@@ -405,51 +405,6 @@ export default function ChannelsPage() {
         </div>
       </div>
 
-      {/* ─── Android App Direct Banner ─── */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-3xl p-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 text-white shadow-lg border border-emerald-400/30"
-      >
-        <div className="absolute top-0 right-0 -mr-8 -mt-8 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row items-center justify-between gap-5 relative z-10">
-          <div className="flex items-center gap-4 text-center md:text-right flex-col md:flex-row">
-            <div className="p-3.5 bg-white/15 backdrop-blur-md rounded-2xl border border-white/25 shadow-inner">
-              <Smartphone className="h-8 w-8 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 justify-center md:justify-start mb-0.5">
-                <span className="px-2 py-0.5 rounded-full bg-white/20 text-[11px] font-bold tracking-wide">
-                  تطبيق الهاتف PWA
-                </span>
-                <span className="text-emerald-200 text-xs font-semibold">جاهز للتثبيت</span>
-              </div>
-              <h2 className="text-xl font-bold">تطبيق منصة ثالث ثانوي موهبة</h2>
-              <p className="text-xs text-emerald-100 max-w-xl mt-1 leading-relaxed">
-                ثبّت المنصة مباشرة على هاتفك أو جهازك لتصفح الجداول والواجبات والمكتبة بسرعة فائقة وبدون انقطاع.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            {isAppInstalled ? (
-              <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/20 backdrop-blur-md font-bold text-sm">
-                <CheckCircle2 className="h-5 w-5 text-emerald-300" />
-                <span>التطبيق مثبت لديك بالفعل</span>
-              </div>
-            ) : (
-              <Button
-                onClick={handleInstallClick}
-                className="h-12 px-6 rounded-2xl bg-white text-emerald-800 hover:bg-emerald-50 font-extrabold shadow-md gap-2"
-              >
-                <Download className="h-5 w-5" />
-                <span>تثبيت على الشاشة الرئيسية</span>
-              </Button>
-            )}
-          </div>
-        </div>
-      </motion.div>
-
       {/* ─── Search & Category Filters ─── */}
       <div className="flex flex-col sm:flex-row items-center gap-3">
         <div className="relative w-full sm:w-80">

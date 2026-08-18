@@ -47,10 +47,27 @@ export default function FlashcardsPage() {
     }
   });
 
-  // Combined cards list
+  // Combined cards list with strict deduplication
   const cards = useMemo(() => {
     const list = Array.isArray(sharedCards) ? sharedCards : DEFAULT_FLASHCARDS;
-    return [...personalCards, ...list];
+    const combined = [...personalCards, ...list];
+    
+    // Strict deduplication by unique ID and trimmed lowercase word
+    const seenIds = new Set<string>();
+    const seenWords = new Set<string>();
+    const uniqueCards: Flashcard[] = [];
+
+    for (const c of combined) {
+      if (!c || !c.word || typeof c.word !== "string") continue;
+      const normalizedWord = c.word.trim().toLowerCase();
+      const cardId = c.id || `fc-${normalizedWord}`;
+      if (!seenIds.has(cardId) && !seenWords.has(normalizedWord)) {
+        seenIds.add(cardId);
+        seenWords.add(normalizedWord);
+        uniqueCards.push(c);
+      }
+    }
+    return uniqueCards;
   }, [personalCards, sharedCards]);
 
   const [masteredIds, setMasteredIds] = useState<string[]>(() => {
@@ -364,8 +381,20 @@ export default function FlashcardsPage() {
     const difficultyVal = (newCard.difficulty as any) || "متوسط";
 
     if (isAdmin || addMode === "admin") {
+      const isDuplicate = (sharedCards || []).some(
+        (c) => c.word?.trim().toLowerCase() === wordVal.toLowerCase()
+      );
+      if (isDuplicate) {
+        toast({
+          title: "تنبيه",
+          description: "هذه الكلمة موجودة بالفعل في قائمة البطاقات العامة.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const created: Flashcard = {
-        id: `fc-global-${Date.now()}`,
+        id: `fc-global-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         word: wordVal,
         phonetic: phoneticVal,
         partOfSpeech: partOfSpeechVal,
@@ -375,13 +404,27 @@ export default function FlashcardsPage() {
         category: categoryVal,
         difficulty: difficultyVal,
       };
-      saveStoredFlashcards([created, ...sharedCards]);
-      setSharedCards(prev => [created, ...prev]);
+
+      const updated = [created, ...(sharedCards || []).filter(c => c.word?.trim().toLowerCase() !== wordVal.toLowerCase())];
+      setSharedCards(updated);
+      saveStoredFlashcards(updated);
       toast({ title: "تم إضافة البطاقة العامة 🌟", description: `تم نشر بطاقة "${created.word}" لجميع الطلاب.` });
     } else {
       // Personal for student only
+      const isDuplicate = personalCards.some(
+        (c) => c.word?.trim().toLowerCase() === wordVal.toLowerCase()
+      );
+      if (isDuplicate) {
+        toast({
+          title: "تنبيه",
+          description: "هذه الكلمة موجودة بالفعل في قائمتك الخاصة.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const created: EnhancedFlashcard = {
-        id: `fc-personal-${profile?.id || 1}-${Date.now()}`,
+        id: `fc-personal-${profile?.id || 1}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         word: wordVal,
         phonetic: phoneticVal,
         partOfSpeech: partOfSpeechVal,
@@ -393,7 +436,9 @@ export default function FlashcardsPage() {
         isPersonal: true,
         studentId: profile?.id || 1,
       };
-      savePersonalCards([created, ...personalCards]);
+      
+      const updated = [created, ...personalCards.filter(c => c.word?.trim().toLowerCase() !== wordVal.toLowerCase())];
+      savePersonalCards(updated);
       toast({
         title: "تمت إضافة البطاقة الخاصة 👤",
         description: `أضيفت كلمة "${created.word}" لقائمتك الخاصة بك فقط.`,

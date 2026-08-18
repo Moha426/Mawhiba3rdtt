@@ -7,6 +7,8 @@ import {
   communityChannels,
   escalatedQuestions,
   suggestions,
+  polls,
+  pollVotes,
 } from "./schema";
 import { eq, desc, and, isNull, or, sql } from "drizzle-orm";
 import fs from "fs";
@@ -23,6 +25,8 @@ interface LocalStore {
   communityChannels: any[];
   escalatedQuestions: any[];
   suggestions: any[];
+  polls: any[];
+  pollVotes: any[];
 }
 
 const STORE_FILE_PATH = path.join(process.cwd(), ".local_db_store.json");
@@ -259,6 +263,9 @@ const initialEscalatedQuestions = [
   },
 ];
 
+const initialPolls: any[] = [];
+const initialPollVotes: any[] = [];
+
 let memoryStore: LocalStore = {
   users: [],
   studyFiles: initialFiles,
@@ -267,6 +274,8 @@ let memoryStore: LocalStore = {
   communityChannels: initialChannels,
   escalatedQuestions: initialEscalatedQuestions,
   suggestions: [],
+  polls: [],
+  pollVotes: [],
 };
 
 // Try loading persisted file store
@@ -282,11 +291,40 @@ try {
       studyFiles: loaded.studyFiles?.length > 0 ? loaded.studyFiles : initialFiles,
       flashcards: loaded.flashcards?.length > 0 ? loaded.flashcards : initialFlashcards,
       escalatedQuestions: loaded.escalatedQuestions?.length > 0 ? loaded.escalatedQuestions : initialEscalatedQuestions,
-      suggestions: loaded.suggestions?.length > 0 ? loaded.suggestions : [],
+      suggestions: Array.isArray(loaded.suggestions) ? loaded.suggestions : [],
+      polls: Array.isArray(loaded.polls) ? loaded.polls : [],
+      pollVotes: Array.isArray(loaded.pollVotes) ? loaded.pollVotes : [],
     };
   }
 } catch (e) {
   // Use memoryStore default
+}
+
+let adminFirestoreForSync: any = null;
+
+export async function loadMemoryStoreFromFirestore(db: any) {
+  adminFirestoreForSync = db;
+  try {
+    const doc = await db.collection("server_store").doc("memoryStore").get();
+    if (doc.exists) {
+      const loaded = doc.data();
+      memoryStore = {
+        ...memoryStore,
+        ...loaded,
+        educationalPlatforms: loaded.educationalPlatforms?.length > 0 ? loaded.educationalPlatforms : initialPlatforms,
+        communityChannels: loaded.communityChannels?.length > 0 ? loaded.communityChannels : initialChannels,
+        studyFiles: loaded.studyFiles?.length > 0 ? loaded.studyFiles : initialFiles,
+        flashcards: loaded.flashcards?.length > 0 ? loaded.flashcards : initialFlashcards,
+        escalatedQuestions: loaded.escalatedQuestions?.length > 0 ? loaded.escalatedQuestions : initialEscalatedQuestions,
+        suggestions: Array.isArray(loaded.suggestions) ? loaded.suggestions : memoryStore.suggestions,
+        polls: Array.isArray(loaded.polls) ? loaded.polls : memoryStore.polls,
+        pollVotes: Array.isArray(loaded.pollVotes) ? loaded.pollVotes : memoryStore.pollVotes,
+      };
+      console.log("Memory store loaded from Firestore successfully.");
+    }
+  } catch (err) {
+    console.warn("Failed to load memoryStore from Firestore:", err);
+  }
 }
 
 function persistStore() {
@@ -294,6 +332,14 @@ function persistStore() {
     fs.writeFileSync(STORE_FILE_PATH, JSON.stringify(memoryStore, null, 2), "utf-8");
   } catch (e) {
     // ignore
+  }
+
+  if (adminFirestoreForSync) {
+    try {
+      adminFirestoreForSync.collection("server_store").doc("memoryStore").set(memoryStore).catch((e: any) => {
+        // fail silently in background
+      });
+    } catch (err) {}
   }
 }
 
@@ -1106,4 +1152,395 @@ export async function deleteSuggestion(id: string) {
   return { success: true };
 }
 
-// ================= SUGGESTIONS QUERIES =================
+// ================= POLLS & VOTING QUERIES =================
+export async function getAllPolls() {
+  const dbInstance = getDb();
+  if (dbInstance) {
+    try {
+      return await dbInstance
+        .select()
+        .from(polls)
+        .orderBy(desc(polls.isPinned), desc(polls.createdAt));
+    } catch (error) {
+      recordDbFailure(error);
+      console.warn("Cloud SQL polls fetch skipped, using local store:", error);
+    }
+  }
+
+  return [...memoryStore.polls].sort((a, b) => {
+    if (Boolean(b.isPinned) !== Boolean(a.isPinned)) {
+      return b.isPinned ? 1 : -1;
+    }
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+  });
+}
+
+export async function getPollById(id: number) {
+  const dbInstance = getDb();
+  if (dbInstance) {
+    try {
+      const res = await dbInstance.select().from(polls).where(eq(polls.id, id));
+      return res[0] || null;
+    } catch (error) {
+      recordDbFailure(error);
+      console.warn("Cloud SQL poll by id skipped, using local store:", error);
+    }
+  }
+  return memoryStore.polls.find((p) => Number(p.id) === Number(id)) || null;
+}
+
+export async function insertPoll(data: any) {
+  const optionsStr = typeof data.options === "string" ? data.options : JSON.stringify(data.options || []);
+  const cleanData: any = {
+    question: data.question,
+    options: optionsStr,
+    status: data.status || "active",
+    type: data.type || "choice",
+    category: data.category || "تنظيمي وجداول",
+    imageUrl: data.imageUrl || null,
+    isPublic: data.isPublic !== false,
+    totalVotes: typeof data.totalVotes === "number" ? data.totalVotes : 0,
+    allowMultiple: Boolean(data.allowMultiple),
+    preventWithdraw: Boolean(data.preventWithdraw),
+    isPinned: Boolean(data.isPinned),
+    correctOptionIndex: data.correctOptionIndex !== undefined ? data.correctOptionIndex : null,
+    quizExplanation: data.quizExplanation || null,
+    actionTitle: data.actionTitle || null,
+    actionDescription: data.actionDescription || null,
+    actionStatus: data.actionStatus || "pending",
+    actionExecutedBy: data.actionExecutedBy || null,
+    actionExecutedAt: data.actionExecutedAt ? new Date(data.actionExecutedAt) : null,
+    showVoterNames: data.showVoterNames !== false,
+    expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+  };
+
+  const dbInstance = getDb();
+  if (dbInstance) {
+    try {
+      const inserted = await dbInstance
+        .insert(polls)
+        .values({
+          ...cleanData,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+      return inserted[0];
+    } catch (error) {
+      recordDbFailure(error);
+      console.warn("Cloud SQL poll insert skipped, using local store:", error);
+    }
+  }
+
+  const nextId = memoryStore.polls.length > 0 ? Math.max(...memoryStore.polls.map(p => Number(p.id) || 0)) + 1 : 1;
+  const newPoll = {
+    id: nextId,
+    ...cleanData,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  memoryStore.polls.unshift(newPoll);
+  persistStore();
+  return newPoll;
+}
+
+export async function updatePoll(id: number, updateData: any) {
+  const dbInstance = getDb();
+  if (dbInstance) {
+    try {
+      const cleanUpdate: any = { updatedAt: new Date() };
+      if (updateData.question !== undefined) cleanUpdate.question = updateData.question;
+      if (updateData.options !== undefined) {
+        cleanUpdate.options = typeof updateData.options === "string" ? updateData.options : JSON.stringify(updateData.options);
+      }
+      if (updateData.status !== undefined) cleanUpdate.status = updateData.status;
+      if (updateData.type !== undefined) cleanUpdate.type = updateData.type;
+      if (updateData.category !== undefined) cleanUpdate.category = updateData.category;
+      if (updateData.imageUrl !== undefined) cleanUpdate.imageUrl = updateData.imageUrl;
+      if (updateData.isPublic !== undefined) cleanUpdate.isPublic = updateData.isPublic;
+      if (updateData.totalVotes !== undefined) cleanUpdate.totalVotes = updateData.totalVotes;
+      if (updateData.allowMultiple !== undefined) cleanUpdate.allowMultiple = updateData.allowMultiple;
+      if (updateData.preventWithdraw !== undefined) cleanUpdate.preventWithdraw = updateData.preventWithdraw;
+      if (updateData.isPinned !== undefined) cleanUpdate.isPinned = Boolean(updateData.isPinned);
+      if (updateData.correctOptionIndex !== undefined) cleanUpdate.correctOptionIndex = updateData.correctOptionIndex;
+      if (updateData.quizExplanation !== undefined) cleanUpdate.quizExplanation = updateData.quizExplanation;
+      if (updateData.actionTitle !== undefined) cleanUpdate.actionTitle = updateData.actionTitle;
+      if (updateData.actionDescription !== undefined) cleanUpdate.actionDescription = updateData.actionDescription;
+      if (updateData.actionStatus !== undefined) cleanUpdate.actionStatus = updateData.actionStatus;
+      if (updateData.actionExecutedBy !== undefined) cleanUpdate.actionExecutedBy = updateData.actionExecutedBy;
+      if (updateData.actionExecutedAt !== undefined) {
+        cleanUpdate.actionExecutedAt = updateData.actionExecutedAt ? new Date(updateData.actionExecutedAt) : null;
+      }
+      if (updateData.showVoterNames !== undefined) cleanUpdate.showVoterNames = updateData.showVoterNames;
+      if (updateData.expiresAt !== undefined) {
+        cleanUpdate.expiresAt = updateData.expiresAt ? new Date(updateData.expiresAt) : null;
+      }
+
+      const updated = await dbInstance
+        .update(polls)
+        .set(cleanUpdate)
+        .where(eq(polls.id, id))
+        .returning();
+      return updated[0];
+    } catch (error) {
+      recordDbFailure(error);
+      console.warn("Cloud SQL poll update skipped, using local store:", error);
+    }
+  }
+
+  const poll = memoryStore.polls.find((p) => Number(p.id) === Number(id));
+  if (poll) {
+    if (updateData.options && typeof updateData.options !== "string") {
+      updateData.options = JSON.stringify(updateData.options);
+    }
+    Object.assign(poll, updateData);
+    poll.updatedAt = new Date().toISOString();
+    persistStore();
+  }
+  return poll;
+}
+
+export async function deletePoll(id: number) {
+  const dbInstance = getDb();
+  if (dbInstance) {
+    try {
+      await dbInstance.delete(pollVotes).where(eq(pollVotes.pollId, id));
+      return await dbInstance.delete(polls).where(eq(polls.id, id)).returning();
+    } catch (error) {
+      recordDbFailure(error);
+      console.warn("Cloud SQL poll delete skipped, using local store:", error);
+    }
+  }
+
+  memoryStore.pollVotes = memoryStore.pollVotes.filter((v) => Number(v.pollId) !== Number(id));
+  memoryStore.polls = memoryStore.polls.filter((p) => Number(p.id) !== Number(id));
+  persistStore();
+  return { success: true };
+}
+
+export async function getPollVotes(pollId: number) {
+  const dbInstance = getDb();
+  if (dbInstance) {
+    try {
+      return await dbInstance
+        .select()
+        .from(pollVotes)
+        .where(eq(pollVotes.pollId, pollId))
+        .orderBy(desc(pollVotes.createdAt));
+    } catch (error) {
+      recordDbFailure(error);
+      console.warn("Cloud SQL poll votes fetch skipped, using local store:", error);
+    }
+  }
+
+  return memoryStore.pollVotes.filter((v) => Number(v.pollId) === Number(pollId));
+}
+
+export async function submitVote(data: {
+  pollId: number;
+  userId: string;
+  userName: string;
+  optionIndex?: number | null;
+  textAnswer?: string | null;
+  ratingValue?: number | null;
+}) {
+  const pollId = Number(data.pollId);
+  const dbInstance = getDb();
+
+  // Check if poll exists
+  const poll = await getPollById(pollId);
+  if (!poll) {
+    throw new Error("التصويت غير موجود");
+  }
+
+  if (poll.status !== "active") {
+    throw new Error("هذا التصويت مغلق حالياً");
+  }
+
+  if (poll.expiresAt && new Date(poll.expiresAt).getTime() < Date.now()) {
+    throw new Error("انتهت الفترة المحددة لهذا التصويت");
+  }
+
+  const cleanVote = {
+    pollId,
+    userId: data.userId || "anonymous",
+    userName: data.userName || "طالب مجهول",
+    optionIndex: data.optionIndex !== undefined && data.optionIndex !== null ? Number(data.optionIndex) : null,
+    textAnswer: data.textAnswer ? String(data.textAnswer).trim() : null,
+    ratingValue: data.ratingValue !== undefined && data.ratingValue !== null ? Number(data.ratingValue) : null,
+  };
+
+  if (dbInstance) {
+    try {
+      // If poll does NOT allow multiple, remove existing vote for this user first
+      if (!poll.allowMultiple) {
+        await dbInstance
+          .delete(pollVotes)
+          .where(and(eq(pollVotes.pollId, pollId), eq(pollVotes.userId, cleanVote.userId)));
+      } else if (cleanVote.optionIndex !== null && cleanVote.optionIndex !== undefined) {
+        // In multiple choice mode, clicking an already selected option toggles it off
+        const existingVoteForOption = await dbInstance
+          .select()
+          .from(pollVotes)
+          .where(
+            and(
+              eq(pollVotes.pollId, pollId),
+              eq(pollVotes.userId, cleanVote.userId),
+              eq(pollVotes.optionIndex, cleanVote.optionIndex)
+            )
+          );
+
+        if (existingVoteForOption.length > 0) {
+          await dbInstance
+            .delete(pollVotes)
+            .where(
+              and(
+                eq(pollVotes.pollId, pollId),
+                eq(pollVotes.userId, cleanVote.userId),
+                eq(pollVotes.optionIndex, cleanVote.optionIndex)
+              )
+            );
+
+          const allVotes = await dbInstance
+            .select()
+            .from(pollVotes)
+            .where(eq(pollVotes.pollId, pollId));
+
+          await dbInstance
+            .update(polls)
+            .set({ totalVotes: allVotes.length, updatedAt: new Date() })
+            .where(eq(polls.id, pollId));
+
+          return { toggledOff: true, totalVotes: allVotes.length };
+        }
+      }
+
+      const inserted = await dbInstance
+        .insert(pollVotes)
+        .values({
+          ...cleanVote,
+          createdAt: new Date(),
+        })
+        .returning();
+
+      // Recalculate total votes
+      const allVotes = await dbInstance
+        .select()
+        .from(pollVotes)
+        .where(eq(pollVotes.pollId, pollId));
+      
+      const totalCount = allVotes.length;
+      await dbInstance
+        .update(polls)
+        .set({ totalVotes: totalCount, updatedAt: new Date() })
+        .where(eq(polls.id, pollId));
+
+      return { vote: inserted[0], totalVotes: totalCount };
+    } catch (error) {
+      recordDbFailure(error);
+      console.warn("Cloud SQL vote submit skipped, using local store:", error);
+    }
+  }
+
+  // Memory fallback
+  if (!poll.allowMultiple) {
+    memoryStore.pollVotes = memoryStore.pollVotes.filter(
+      (v) => !(Number(v.pollId) === pollId && v.userId === cleanVote.userId)
+    );
+  } else if (cleanVote.optionIndex !== null && cleanVote.optionIndex !== undefined) {
+    const existingIdx = memoryStore.pollVotes.findIndex(
+      (v) =>
+        Number(v.pollId) === pollId &&
+        v.userId === cleanVote.userId &&
+        Number(v.optionIndex) === Number(cleanVote.optionIndex)
+    );
+    if (existingIdx >= 0) {
+      memoryStore.pollVotes.splice(existingIdx, 1);
+      const currentTotal = memoryStore.pollVotes.filter((v) => Number(v.pollId) === pollId).length;
+      const targetPoll = memoryStore.polls.find((p) => Number(p.id) === pollId);
+      if (targetPoll) {
+        targetPoll.totalVotes = currentTotal;
+        targetPoll.updatedAt = new Date().toISOString();
+      }
+      persistStore();
+      return { toggledOff: true, totalVotes: currentTotal };
+    }
+  }
+
+  const nextVoteId = memoryStore.pollVotes.length > 0
+    ? Math.max(...memoryStore.pollVotes.map((v) => Number(v.id) || 0)) + 1
+    : 1;
+
+  const newVote = {
+    id: nextVoteId,
+    ...cleanVote,
+    createdAt: new Date().toISOString(),
+  };
+
+  memoryStore.pollVotes.push(newVote);
+
+  // Update total votes
+  const currentTotal = memoryStore.pollVotes.filter((v) => Number(v.pollId) === pollId).length;
+  const targetPoll = memoryStore.polls.find((p) => Number(p.id) === pollId);
+  if (targetPoll) {
+    targetPoll.totalVotes = currentTotal;
+    targetPoll.updatedAt = new Date().toISOString();
+  }
+
+  persistStore();
+  return { vote: newVote, totalVotes: currentTotal };
+}
+
+export async function withdrawVote(pollId: number, userId: string) {
+  const poll = await getPollById(pollId);
+  if (!poll) throw new Error("التصويت غير موجود");
+  if (poll.preventWithdraw) throw new Error("سحب التصويت غير متاح لهذا الاستفتاء");
+
+  const dbInstance = getDb();
+  if (dbInstance) {
+    try {
+      await dbInstance
+        .delete(pollVotes)
+        .where(and(eq(pollVotes.pollId, pollId), eq(pollVotes.userId, userId)));
+
+      const allVotes = await dbInstance
+        .select()
+        .from(pollVotes)
+        .where(eq(pollVotes.pollId, pollId));
+
+      const totalCount = allVotes.length;
+      await dbInstance
+        .update(polls)
+        .set({ totalVotes: totalCount, updatedAt: new Date() })
+        .where(eq(polls.id, pollId));
+
+      return { success: true, totalVotes: totalCount };
+    } catch (error) {
+      recordDbFailure(error);
+      console.warn("Cloud SQL vote withdraw skipped, using local store:", error);
+    }
+  }
+
+  memoryStore.pollVotes = memoryStore.pollVotes.filter(
+    (v) => !(Number(v.pollId) === Number(pollId) && v.userId === userId)
+  );
+
+  const currentTotal = memoryStore.pollVotes.filter((v) => Number(v.pollId) === Number(pollId)).length;
+  const targetPoll = memoryStore.polls.find((p) => Number(p.id) === Number(pollId));
+  if (targetPoll) {
+    targetPoll.totalVotes = currentTotal;
+    targetPoll.updatedAt = new Date().toISOString();
+  }
+
+  persistStore();
+  return { success: true, totalVotes: currentTotal };
+}
+
+export async function syncPollVotes(pollId: number) {
+  const votes = await getPollVotes(pollId);
+  const totalCount = votes.length;
+  await updatePoll(pollId, { totalVotes: totalCount });
+  return { pollId, totalVotes: totalCount, votes };
+}
+

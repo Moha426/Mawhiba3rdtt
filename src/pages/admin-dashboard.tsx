@@ -18,6 +18,7 @@ import { LibraryTab } from "@/components/admin/library-tab";
 import { ChannelsTab } from "@/components/admin/channels-tab";
 import { FlashcardsTab } from "@/components/admin/flashcards-tab";
 import { EscalatedQuestionsTab } from "@/components/admin/escalated-questions-tab";
+import { PollsTab } from "@/components/admin/polls-tab";
 import { motion } from "framer-motion";
 import { useGetDashboardStats, useListStudents, useListQuizzes, exportAllAppData, pushAllLocalDataToCloud } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -220,6 +221,10 @@ export default function AdminDashboard() {
               <Languages className="h-3.5 w-3.5" />
               بطاقات الإنجليزية
             </TabsTrigger>
+            <TabsTrigger value="polls" className={triggerClass}>
+              <Users className="h-3.5 w-3.5 text-purple-500" />
+              استطلاعات الرأي والتصويت
+            </TabsTrigger>
             <TabsTrigger value="escalated-questions" className={`${triggerClass} relative`}>
               <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
               <span>أسئلة الطلاب المستعصية</span>
@@ -268,6 +273,9 @@ export default function AdminDashboard() {
         </TabsContent>
         <TabsContent value="flashcards" className="m-0">
           <FlashcardsTab />
+        </TabsContent>
+        <TabsContent value="polls" className="m-0">
+          <PollsTab />
         </TabsContent>
         <TabsContent value="escalated-questions" className="m-0">
           <EscalatedQuestionsTab />

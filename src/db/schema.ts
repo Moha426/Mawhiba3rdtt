@@ -141,3 +141,43 @@ export const suggestions = pgTable("suggestions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Polls Table
+export const polls = pgTable("polls", {
+  id: serial("id").primaryKey(),
+  question: text("question").notNull(),
+  options: text("options").notNull(), // JSON serialized array: string[]
+  status: text("status").notNull().default("active"), // 'active' | 'closed'
+  type: text("type").notNull().default("choice"), // 'choice' | 'text' | 'quiz' | 'action' | 'rating' | 'emoji'
+  category: text("category").default("تنظيمي وجداول"),
+  imageUrl: text("image_url"),
+  isPublic: boolean("is_public").default(true),
+  totalVotes: integer("total_votes").default(0),
+  allowMultiple: boolean("allow_multiple").default(false),
+  preventWithdraw: boolean("prevent_withdraw").default(false),
+  isPinned: boolean("is_pinned").default(false),
+  correctOptionIndex: integer("correct_option_index"),
+  quizExplanation: text("quiz_explanation"),
+  actionTitle: text("action_title"),
+  actionDescription: text("action_description"),
+  actionStatus: text("action_status").default("pending"),
+  actionExecutedBy: text("action_executed_by"),
+  actionExecutedAt: timestamp("action_executed_at"),
+  showVoterNames: boolean("show_voter_names").default(true),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Poll Votes Table
+export const pollVotes = pgTable("poll_votes", {
+  id: serial("id").primaryKey(),
+  pollId: integer("poll_id").notNull(),
+  userId: text("user_id"), // uid or dynamic student ID
+  userName: text("user_name"),
+  optionIndex: integer("option_index"), // null for text poll
+  textAnswer: text("text_answer"), // for text answers
+  ratingValue: integer("rating_value"), // for 1-5 star ratings
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+

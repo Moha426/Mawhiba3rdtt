@@ -138,19 +138,32 @@ export function FlashcardsTab() {
       updateCardsList(updated);
       toast({ title: "تم تحديث الكلمة ✏️", description: `تم تعديل بيانات "${formWord.trim()}" بنجاح.` });
     } else {
+      // Check duplicate
+      const wordClean = formWord.trim();
+      const isDuplicate = cards.some(c => c.word?.trim().toLowerCase() === wordClean.toLowerCase());
+      if (isDuplicate) {
+        toast({
+          title: "تنبيه",
+          description: `الكلمة "${wordClean}" موجودة بالفعل في البطاقات.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Add new
       const newCardItem: Flashcard = {
-        id: `fc-admin-${Date.now()}`,
-        word: formWord.trim(),
+        id: `fc-admin-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        word: wordClean,
         phonetic: formPhonetic.trim() || "/.../",
         partOfSpeech: formPartOfSpeech,
         meaningAr: formMeaningAr.trim(),
-        exampleEn: formExampleEn.trim() || `Example with ${formWord.trim()}.`,
-        exampleAr: formExampleAr.trim() || `جملة توضيحية للكلمة ${formWord.trim()}.`,
+        exampleEn: formExampleEn.trim() || `Example with ${wordClean}.`,
+        exampleAr: formExampleAr.trim() || `جملة توضيحية للكلمة ${wordClean}.`,
         category: formCategory.trim() || "عام",
         difficulty: formDifficulty,
       };
-      updateCardsList([newCardItem, ...cards]);
+      const updated = [newCardItem, ...cards.filter(c => c.word?.trim().toLowerCase() !== wordClean.toLowerCase())];
+      updateCardsList(updated);
       toast({ title: "تمت إضافة الكلمة 🌟", description: `تمت إضافة كلمة "${newCardItem.word}" بنجاح!` });
     }
 

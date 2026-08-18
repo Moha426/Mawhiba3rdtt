@@ -97,7 +97,7 @@ const navItems = [
   { href: "/schedule", label: "الجدول الدراسي", icon: GraduationCap },
   { href: "/timer", label: "مؤقت المذاكرة", icon: Timer },
   { href: "/calendar", label: "التقويم الزمني", icon: CalendarDays },
-  { href: "/teacher", label: "المعلمون", icon: Users },
+  { href: "/teacher", label: "المعلمون والأسئلة", icon: Users },
 ];
 
 
