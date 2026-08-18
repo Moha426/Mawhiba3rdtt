@@ -764,15 +764,6 @@ export default function AITutorPage() {
                       <ThumbsUp className="h-4 w-4" />
                       <span>فهمت الحل (+15 نقطة)</span>
                     </Button>
-
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsEscalateOpen(true)}
-                      className="h-10 rounded-xl font-bold gap-2 text-xs border-rose-500/40 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
-                    >
-                      <AlertCircle className="h-4 w-4" />
-                      <span>لم أستفد / إرسال للمعلم</span>
-                    </Button>
                   </div>
                 </div>
               )}

@@ -97,7 +97,6 @@ const navItems = [
   { href: "/schedule", label: "الجدول الدراسي", icon: GraduationCap },
   { href: "/timer", label: "مؤقت المذاكرة", icon: Timer },
   { href: "/calendar", label: "التقويم الزمني", icon: CalendarDays },
-  { href: "/teacher", label: "المعلمون والأسئلة", icon: Users },
 ];
 
 
@@ -666,7 +665,6 @@ function MobileBottomNav({
     { href: "/schedule", label: "الجدول الدراسي", icon: GraduationCap, desc: "الحصص اليومية والأسبوعية" },
     { href: "/timer", label: "مؤقت المذاكرة", icon: Timer, desc: "بومودورو والتركيز" },
     { href: "/calendar", label: "التقويم الزمني", icon: CalendarDays, desc: "الأحداث والمواعيد والإجازات" },
-    { href: "/teacher", label: "المعلمون", icon: Users, desc: "دليل المعلمين والتواصل" },
     ...(isAdmin ? [{ href: "/admin/dashboard", label: "لوحة التحكم", icon: Shield, desc: "إدارة النظام والمحتوى" }] : []),
   ];
 

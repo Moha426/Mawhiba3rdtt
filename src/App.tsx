@@ -324,8 +324,6 @@ function AppRouter() {
         <Route path="/admin"><AnimatedPage><AdminLogin /></AnimatedPage></Route>
         <Route path="/timer"><AnimatedPage><TimerPage /></AnimatedPage></Route>
         <Route path="/teacher"><AnimatedPage><TeacherPage /></AnimatedPage></Route>
-        <Route path="/feedback"><AnimatedPage><TeacherPage /></AnimatedPage></Route>
-        <Route path="/suggestions"><AnimatedPage><TeacherPage /></AnimatedPage></Route>
         <Route path="/platforms"><AnimatedPage><PlatformsPage /></AnimatedPage></Route>
         <Route path="/admin/dashboard"><AnimatedPage><AdminDashboard /></AnimatedPage></Route>
         <Route><AnimatedPage><NotFound /></AnimatedPage></Route>

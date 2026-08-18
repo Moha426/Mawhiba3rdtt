@@ -56,41 +56,8 @@ export async function createServer() {
   
   const PORT = process.env.PORT || 3000;
 
-  // Initialize firebase-admin
+  // Firebase initialization disabled per user request
   let firestoreDb: any = null;
-  try {
-    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-    let firestoreDbId: string | undefined;
-    if (admin.apps.length === 0) {
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-        admin.initializeApp({
-          projectId: config.projectId,
-        });
-        firestoreDbId = config.firestoreDatabaseId;
-        console.log("Firebase Admin initialized with project ID:", config.projectId);
-      } else {
-        admin.initializeApp();
-      }
-    } else if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-      firestoreDbId = config.firestoreDatabaseId;
-    }
-    
-    if (firestoreDbId) {
-      const { getFirestore } = await import("firebase-admin/firestore");
-      firestoreDb = getFirestore(admin.app(), firestoreDbId);
-    } else {
-      firestoreDb = admin.firestore();
-    }
-    
-    // Load backend data if Cloud SQL is missing
-    if (!isCloudSqlConfigured()) {
-      await loadMemoryStoreFromFirestore(firestoreDb);
-    }
-  } catch (err) {
-    console.warn("Failed to initialize Firebase Admin, falling back to server memory:", err);
-  }
 
   app.use(express.json({ limit: "25mb" }));
 

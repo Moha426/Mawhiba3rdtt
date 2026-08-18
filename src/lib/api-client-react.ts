@@ -14,8 +14,8 @@ function queueDebouncedFirestoreWrite(key: string, value: any) {
     try {
       const docRef = doc(db, "app_data", key);
       const cleanValue = JSON.parse(JSON.stringify(value));
-      await setDoc(docRef, { value: cleanValue, updatedAt: serverTimestamp() }, { merge: true });
-    } catch (err) { console.error("FIRESTORE WRITE ERROR:", err); }
+      await safeFirestoreWrite(() => setDoc(docRef, { value: cleanValue, updatedAt: serverTimestamp() }, { merge: true }));
+    } catch (err) { console.warn("Firestore write skipped:", err); }
   }, 1000); // 1 second debounce
   writeDebounceTimers.set(key, timer);
 }
@@ -202,8 +202,8 @@ export async function pushAllLocalDataToCloud(): Promise<{ success: boolean; syn
       if (val !== null && val !== undefined) {
         try {
           const docRef = doc(db, "app_data", key);
-          await setDoc(docRef, { value: val, updatedAt: serverTimestamp() }, { merge: true });
-        } catch (err) { console.error("FIRESTORE WRITE ERROR:", err); }
+          await safeFirestoreWrite(() => setDoc(docRef, { value: val, updatedAt: serverTimestamp() }, { merge: true }));
+        } catch (err) { console.warn("Firestore write skipped:", err); }
         synced.push(key);
       }
     }
@@ -218,8 +218,8 @@ export async function pushAllLocalDataToCloud(): Promise<{ success: boolean; syn
             if (f.id) {
               try {
                 const fileDoc = doc(db, "files", f.id);
-                await setDoc(fileDoc, { ...f, timestamp: serverTimestamp() }, { merge: true });
-              } catch (err) { console.error("FIRESTORE WRITE ERROR:", err); }
+                await safeFirestoreWrite(() => setDoc(fileDoc, { ...f, timestamp: serverTimestamp() }, { merge: true }));
+              } catch (err) { console.warn("Firestore write skipped:", err); }
             }
           }
           synced.push("files");
@@ -302,8 +302,8 @@ export async function importAllAppData(bundle: Record<string, any>): Promise<{ s
 
       try {
         const docRef = doc(db, "app_data", key);
-        await setDoc(docRef, { value: val, updatedAt: serverTimestamp() }, { merge: true });
-      } catch (err) { console.error("FIRESTORE WRITE ERROR:", err); }
+        await safeFirestoreWrite(() => setDoc(docRef, { value: val, updatedAt: serverTimestamp() }, { merge: true }));
+      } catch (err) { console.warn("Firestore write skipped:", err); }
       count++;
     }
   }
@@ -315,8 +315,8 @@ export async function importAllAppData(bundle: Record<string, any>): Promise<{ s
         if (f.id) {
           try {
             const fileDoc = doc(db, "files", f.id);
-            await setDoc(fileDoc, { ...f, timestamp: serverTimestamp() }, { merge: true });
-          } catch (err) { console.error("FIRESTORE WRITE ERROR:", err); }
+            await safeFirestoreWrite(() => setDoc(fileDoc, { ...f, timestamp: serverTimestamp() }, { merge: true }));
+          } catch (err) { console.warn("Firestore write skipped:", err); }
         }
       }
     } catch {}
