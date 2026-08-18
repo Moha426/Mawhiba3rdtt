@@ -24,7 +24,9 @@ import {
   Share2,
   Pin,
   Layers,
-  PlusCircle
+  PlusCircle,
+  Edit3,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +38,8 @@ import {
   usePolls,
   votePollApi,
   withdrawPollVoteApi,
+  updatePollVoteByIdApi,
+  deletePollVoteByIdApi,
   type PollWithStats
 } from "@/lib/polls";
 
@@ -55,6 +59,8 @@ export function PollsSection({ className = "", limit, showAllLink = false }: Pol
   const [textResponses, setTextResponses] = useState<Record<number, string>>({});
   const [hoverRating, setHoverRating] = useState<Record<number, number>>({});
   const [submittingPollId, setSubmittingPollId] = useState<number | null>(null);
+  const [editingVoteId, setEditingVoteId] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState<string>("");
 
   const currentUserName = useMemo(() => {
     return profile?.name || user?.email?.split("@")[0] || "طالب موهبة";
@@ -144,7 +150,8 @@ export function PollsSection({ className = "", limit, showAllLink = false }: Pol
 
     setSubmittingPollId(poll.id);
     try {
-      await votePollApi(poll.id, currentUserId, currentUserName, null, answer);
+      const isMultiple = poll.allowMultiple || (poll.userVotes && poll.userVotes.length > 0);
+      await votePollApi(poll.id, currentUserId, currentUserName, null, answer, null, isMultiple);
       setTextResponses((prev) => ({ ...prev, [poll.id]: "" }));
       toast({
         title: "تم إرسال مشاركتك بنجاح! 🌟",
@@ -155,6 +162,49 @@ export function PollsSection({ className = "", limit, showAllLink = false }: Pol
       toast({
         title: "فشل الإرسال",
         description: err.message || "حدث خطأ أثناء إرسال إجابتك",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingPollId(null);
+    }
+  };
+
+  const handleEditVoteText = async (voteId: number, pollId: number) => {
+    if (!editingText.trim()) return;
+    setSubmittingPollId(pollId);
+    try {
+      await updatePollVoteByIdApi(voteId, editingText.trim());
+      setEditingVoteId(null);
+      setEditingText("");
+      toast({
+        title: "تم تحديث استجابتك ✅",
+        description: "تم حفظ التعديل بنجاح.",
+      });
+      await refreshPolls();
+    } catch (err: any) {
+      toast({
+        title: "فشل التعديل",
+        description: err.message || "تعذر حفظ التعديل",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingPollId(null);
+    }
+  };
+
+  const handleDeleteVoteText = async (voteId: number, pollId: number) => {
+    setSubmittingPollId(pollId);
+    try {
+      await deletePollVoteByIdApi(voteId);
+      toast({
+        title: "تم حذف الاستجابة 🗑️",
+        description: "تم حذف مشاركتك السابقة بنجاح.",
+      });
+      await refreshPolls();
+    } catch (err: any) {
+      toast({
+        title: "فشل الحذف",
+        description: err.message || "تعذر حذف المشاركة",
         variant: "destructive",
       });
     } finally {
@@ -540,38 +590,101 @@ export function PollsSection({ className = "", limit, showAllLink = false }: Pol
                   {/* ── TYPE: TEXT RESPONSES / SUGGESTIONS ── */}
                   {poll.type === "text" && (
                     <div className="space-y-3">
-                      {/* Past Submissions list for the user if they submitted anything */}
-                      {poll.userTextResponses && poll.userTextResponses.length > 0 && (
+                      {/* My Submissions list with Edit & Delete controls */}
+                      {poll.userVotes && poll.userVotes.filter((v) => Boolean(v.textAnswer)).length > 0 && (
                         <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-2 text-xs">
                           <div className="flex items-center justify-between font-bold text-emerald-900 dark:text-emerald-200 text-[11px]">
                             <span className="flex items-center gap-1.5">
                               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                              <span>استجاباتك المسجلة ({poll.userTextResponses.length}):</span>
+                              <span>إجاباتك ومشاركاتك المسجلة ({poll.userVotes.filter((v) => Boolean(v.textAnswer)).length}):</span>
                             </span>
-                            {poll.allowMultiple && (
-                              <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium">
-                                يمكنك كتابة وإرسال المزيد ✍️
-                              </span>
-                            )}
+                            <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium">
+                              يمكنك تعديل أي مشاركة أو إرسال غيرها ✍️
+                            </span>
                           </div>
-                          <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                            {poll.userTextResponses.map((resp, rIdx) => (
-                              <div
-                                key={rIdx}
-                                className="bg-card/90 rounded-xl p-2 text-xs text-foreground border border-emerald-500/20 flex items-start justify-between gap-2 shadow-2xs"
-                              >
-                                <span className="font-medium">"{resp}"</span>
-                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
-                                  #{rIdx + 1}
-                                </span>
-                              </div>
-                            ))}
+                          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            {poll.userVotes
+                              .filter((v) => Boolean(v.textAnswer))
+                              .map((v, rIdx) => {
+                                const isEditing = editingVoteId === v.id;
+                                return (
+                                  <div
+                                    key={v.id || rIdx}
+                                    className="bg-card rounded-xl p-2.5 text-xs text-foreground border border-emerald-500/30 space-y-2 shadow-2xs"
+                                  >
+                                    {isEditing ? (
+                                      <div className="space-y-2">
+                                        <Input
+                                          value={editingText}
+                                          onChange={(e) => setEditingText(e.target.value)}
+                                          className="text-xs h-9 rounded-xl"
+                                          disabled={isBusy}
+                                          autoFocus
+                                        />
+                                        <div className="flex items-center gap-1.5 justify-end">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                              setEditingVoteId(null);
+                                              setEditingText("");
+                                            }}
+                                            className="h-7 text-[11px] rounded-lg px-2"
+                                            disabled={isBusy}
+                                          >
+                                            إلغاء
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            onClick={() => handleEditVoteText(v.id, poll.id)}
+                                            className="h-7 text-[11px] rounded-lg px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                                            disabled={isBusy || !editingText.trim()}
+                                          >
+                                            حفظ التعديل
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="font-medium text-foreground leading-relaxed">
+                                          "{v.textAnswer}"
+                                        </span>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            title="تعديل هذه المشاركة"
+                                            onClick={() => {
+                                              setEditingVoteId(v.id);
+                                              setEditingText(v.textAnswer || "");
+                                            }}
+                                            disabled={isBusy || isClosed}
+                                            className="h-7 w-7 rounded-lg text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10"
+                                          >
+                                            <Edit3 className="h-3.5 w-3.5" />
+                                          </Button>
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            title="حذف هذه المشاركة"
+                                            onClick={() => handleDeleteVoteText(v.id, poll.id)}
+                                            disabled={isBusy || isClosed}
+                                            className="h-7 w-7 rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                           </div>
                         </div>
                       )}
 
-                      {/* Input Field: Always show if allowMultiple is true (and not closed), OR if user hasn't voted yet */}
-                      {(!hasVoted || poll.allowMultiple) && !isClosed ? (
+                      {/* Input Field: Always enabled for active text polls */}
+                      {!isClosed && (
                         <div className="space-y-1.5">
                           <div className="flex gap-2">
                             <Input
@@ -580,8 +693,8 @@ export function PollsSection({ className = "", limit, showAllLink = false }: Pol
                                 setTextResponses((prev) => ({ ...prev, [poll.id]: e.target.value }))
                               }
                               placeholder={
-                                poll.allowMultiple && (poll.userTextResponses?.length || 0) > 0
-                                  ? "أضف استجابة أو فكرة إضافية أخرى..."
+                                (poll.userVotes?.filter((v) => Boolean(v.textAnswer)).length || 0) > 0
+                                  ? "أضف فكرة أو استجابة أخرى..."
                                   : "اكتب فكرتك أو إجابتك هنا..."
                               }
                               className="rounded-2xl h-10 text-xs flex-1"
@@ -602,39 +715,33 @@ export function PollsSection({ className = "", limit, showAllLink = false }: Pol
                             >
                               <Send className="h-3.5 w-3.5" />
                               <span>
-                                {poll.allowMultiple && (poll.userTextResponses?.length || 0) > 0
+                                {(poll.userVotes?.filter((v) => Boolean(v.textAnswer)).length || 0) > 0
                                   ? "إرسال أخرى"
                                   : "إرسال"}
                               </span>
                             </Button>
                           </div>
-                          {poll.allowMultiple && (
-                            <p className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
-                              <span>🔄 خاصية الإرسال المتعدد مفعلة: يمكنك إرسال أكثر من فكرة أو إجابة</span>
-                            </p>
-                          )}
-                        </div>
-                      ) : !isClosed && (
-                        <div className="p-3 rounded-2xl bg-muted/40 border border-border/50 text-xs flex items-center justify-between">
-                          <span className="text-muted-foreground font-medium">
-                            تم تسجيل استجابتك. لإعادة الكتابة يمكنك سحب الصوت من الأسفل.
-                          </span>
+                          <p className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                            <span>💡 يمكنك إرسال استجابات متعددة، وتعديل أو حذف أي مشاركة سابقة لك بسهولة.</span>
+                          </p>
                         </div>
                       )}
 
-                      {/* Display Recent Peer Answers */}
-                      {poll.votes.filter((v) => Boolean(v.textAnswer)).length > 0 && (
+                      {/* Display Recent Peer Answers from OTHER users */}
+                      {poll.votes.filter((v) => Boolean(v.textAnswer) && v.userId !== currentUserId).length > 0 && (
                         <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                          <p className="text-[11px] font-bold text-muted-foreground">أحدث مشاركات الطلاب ({poll.votes.filter(v => Boolean(v.textAnswer)).length}):</p>
+                          <p className="text-[11px] font-bold text-muted-foreground">
+                            مشاركات الطلاب الآخرين ({poll.votes.filter((v) => Boolean(v.textAnswer) && v.userId !== currentUserId).length}):
+                          </p>
                           {poll.votes
-                            .filter((v) => Boolean(v.textAnswer))
-                            .slice(0, 5)
+                            .filter((v) => Boolean(v.textAnswer) && v.userId !== currentUserId)
+                            .slice(0, 6)
                             .map((v, idx) => (
                               <div
-                                key={idx}
+                                key={v.id || idx}
                                 className="p-2 rounded-xl bg-muted/30 border border-border/40 text-[11px] flex items-start justify-between gap-2"
                               >
-                                <span className="text-foreground">"{v.textAnswer}"</span>
+                                <span className="text-foreground font-medium">"{v.textAnswer}"</span>
                                 <span className="text-[10px] text-muted-foreground shrink-0">{v.userName}</span>
                               </div>
                             ))}

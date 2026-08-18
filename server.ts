@@ -38,7 +38,6 @@ import {
   submitVote,
   withdrawVote,
   syncPollVotes,
-  loadMemoryStoreFromFirestore, // we will add this
 } from "./src/db/queries";
 import { 
   solveProblemWithGemini, 
@@ -772,7 +771,7 @@ export async function createServer() {
 
   // ================= FRONTEND / STATIC SERVING =================
   const distPath = path.join(process.cwd(), "dist");
-  const isProd = process.env.NODE_ENV === "production" || !fs.existsSync(path.join(process.cwd(), "vite.config.ts")) || fs.existsSync(path.join(distPath, "index.html"));
+  const isProd = process.env.NODE_ENV === "production";
 
   if (!isProd) {
     try {

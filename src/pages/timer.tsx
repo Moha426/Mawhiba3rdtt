@@ -27,7 +27,9 @@ function beep() {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.9);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.9);
-  } catch {}
+  } catch (e) {
+    // AudioContext not allowed or supported
+  }
 }
 
 export default function TimerPage() {

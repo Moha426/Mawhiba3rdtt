@@ -52,10 +52,25 @@ export interface PollWithStats extends Poll {
   userVotedOptions: number[];
   userVotedText?: string | null;
   userTextResponses: string[];
+  userVotes: PollVote[];
   userVotedRating?: number | null;
   averageRating?: number;
   hasVoted: boolean;
   isExpired: boolean;
+}
+
+export function getOrCreateDeviceId(): string {
+  if (typeof window === "undefined") return "guest_client";
+  try {
+    let deviceId = localStorage.getItem("app_poll_device_id_v3");
+    if (!deviceId) {
+      deviceId = "device_" + Math.random().toString(36).substring(2, 10) + "_" + Date.now().toString(36);
+      localStorage.setItem("app_poll_device_id_v3", deviceId);
+    }
+    return deviceId;
+  } catch {
+    return "device_guest";
+  }
 }
 
 export const SAMPLE_POLL_TEMPLATES: Poll[] = [
@@ -125,7 +140,7 @@ export const SAMPLE_POLL_TEMPLATES: Poll[] = [
     imageUrl: null,
     isPublic: true,
     totalVotes: 0,
-    allowMultiple: false,
+    allowMultiple: true,
     preventWithdraw: false,
     expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 20).toISOString(),
     createdAt: new Date().toISOString(),
@@ -297,11 +312,12 @@ export async function votePollApi(
   userName: string,
   optionIndex: number | null,
   textAnswer?: string | null,
-  ratingValue?: number | null
+  ratingValue?: number | null,
+  isMultiple?: boolean
 ): Promise<any> {
   const currentVotes = getCloudVotes();
   const newVote: PollVote = {
-    id: Date.now(),
+    id: Date.now() + Math.floor(Math.random() * 1000),
     pollId,
     userId,
     userName: userName || "طالب",
@@ -311,16 +327,19 @@ export async function votePollApi(
     createdAt: new Date().toISOString(),
   };
 
-  const existingVoteIndex = currentVotes.findIndex(
-    (v) => Number(v.pollId) === Number(pollId) && v.userId === userId
-  );
-
   let nextVotes: PollVote[];
-  if (existingVoteIndex >= 0) {
-    nextVotes = [...currentVotes];
-    nextVotes[existingVoteIndex] = newVote;
-  } else {
+  if (isMultiple) {
     nextVotes = [...currentVotes, newVote];
+  } else {
+    const existingIndex = currentVotes.findIndex(
+      (v) => Number(v.pollId) === Number(pollId) && v.userId === userId
+    );
+    if (existingIndex >= 0) {
+      nextVotes = [...currentVotes];
+      nextVotes[existingIndex] = newVote;
+    } else {
+      nextVotes = [...currentVotes, newVote];
+    }
   }
 
   saveCloudVotes(nextVotes);
@@ -333,7 +352,26 @@ export async function votePollApi(
     }).catch(() => {});
   } catch {}
 
-  return { success: true };
+  return { success: true, vote: newVote };
+}
+
+export async function updatePollVoteByIdApi(voteId: number, newAnswer: string): Promise<boolean> {
+  const currentVotes = getCloudVotes();
+  const nextVotes = currentVotes.map((v) => {
+    if (Number(v.id) === Number(voteId)) {
+      return { ...v, textAnswer: newAnswer };
+    }
+    return v;
+  });
+  saveCloudVotes(nextVotes);
+  return true;
+}
+
+export async function deletePollVoteByIdApi(voteId: number): Promise<boolean> {
+  const currentVotes = getCloudVotes();
+  const nextVotes = currentVotes.filter((v) => Number(v.id) !== Number(voteId));
+  saveCloudVotes(nextVotes);
+  return true;
 }
 
 export async function withdrawPollVoteApi(pollId: number, userId: string): Promise<any> {
@@ -362,7 +400,9 @@ export function usePolls() {
   const [allVotes] = usePersistentState<PollVote[]>("poll_votes", []);
 
   const currentUserId = useMemo(() => {
-    return user?.uid || (profile?.id ? String(profile.id) : "guest_user");
+    if (user?.uid) return user.uid;
+    if (profile?.id) return `student_${profile.id}`;
+    return getOrCreateDeviceId();
   }, [user, profile]);
 
   const pollsWithStats = useMemo<PollWithStats[]>(() => {
@@ -382,17 +422,23 @@ export function usePolls() {
       const optionCounts = new Array(parsedOptions.length).fill(0);
       const userVotedOptions: number[] = [];
       const userTextResponses: string[] = [];
+      const userVotes: PollVote[] = [];
       let userVotedText: string | null = null;
       let userVotedRating: number | null = null;
       let totalRatingSum = 0;
       let totalRatingCount = 0;
 
       for (const vote of votes) {
+        const isMine = vote.userId === currentUserId;
+        if (isMine) {
+          userVotes.push(vote);
+        }
+
         if (vote.optionIndex !== null && vote.optionIndex !== undefined && vote.optionIndex >= 0) {
           if (optionCounts[vote.optionIndex] !== undefined) {
             optionCounts[vote.optionIndex]++;
           }
-          if (vote.userId === currentUserId && !userVotedOptions.includes(vote.optionIndex)) {
+          if (isMine && !userVotedOptions.includes(vote.optionIndex)) {
             userVotedOptions.push(vote.optionIndex);
           }
         }
@@ -400,14 +446,14 @@ export function usePolls() {
         if (vote.ratingValue !== null && vote.ratingValue !== undefined) {
           totalRatingSum += Number(vote.ratingValue);
           totalRatingCount++;
-          if (vote.userId === currentUserId) {
+          if (isMine) {
             userVotedRating = Number(vote.ratingValue);
           }
         }
 
         if (vote.textAnswer) {
-          userTextResponses.push(vote.textAnswer);
-          if (vote.userId === currentUserId) {
+          if (isMine) {
+            userTextResponses.push(vote.textAnswer);
             userVotedText = vote.textAnswer;
           }
         }
@@ -421,7 +467,7 @@ export function usePolls() {
 
       const averageRating = totalRatingCount > 0 ? Number((totalRatingSum / totalRatingCount).toFixed(1)) : 5.0;
       const isExpired = Boolean(poll.expiresAt && new Date(poll.expiresAt).getTime() < Date.now());
-      const hasVoted = userVotedOptions.length > 0 || Boolean(userVotedText) || userVotedRating !== null;
+      const hasVoted = userVotedOptions.length > 0 || userTextResponses.length > 0 || userVotedRating !== null;
 
       return {
         ...poll,
@@ -433,6 +479,7 @@ export function usePolls() {
         userVotedOptions,
         userVotedText,
         userTextResponses,
+        userVotes,
         userVotedRating,
         averageRating,
         hasVoted,
