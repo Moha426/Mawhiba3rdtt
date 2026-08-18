@@ -341,10 +341,12 @@ function AppRouter() {
 import { usePersistentState } from "@/lib/api-client-react";
 
 function RootApp() {
-  // Mount these listeners globally so that flashcards and platforms continuously sync
+  // Mount these listeners globally so that flashcards, platforms, and polls continuously sync
   // from Firestore to LocalStorage via `app_data_change` events in cloud-sync.ts
   usePersistentState<any[]>("flashcards", []);
   usePersistentState<any[]>("platforms", []);
+  usePersistentState<any[]>("polls", []);
+  usePersistentState<any[]>("poll_votes", []);
 
   return (
     <QueryClientProvider client={queryClient}>

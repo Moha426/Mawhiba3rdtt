@@ -139,6 +139,9 @@ export function usePersistentState<T>(key: string, initialValue: T): [T, (val: T
         window.dispatchEvent(new CustomEvent("app_file_updated", { detail: next }));
       } else if (key === "channels") {
         window.dispatchEvent(new CustomEvent("channels_storage_change", { detail: { channels: next } }));
+      } else if (key === "polls" || key === "poll_votes") {
+        localStorage.setItem("talented_school_polls_cache_v3", JSON.stringify(next));
+        window.dispatchEvent(new CustomEvent("polls_data_change", { detail: { key, value: next } }));
       }
     } catch {}
 
@@ -171,6 +174,8 @@ export const SYNC_KEYS = [
   "settings",
   "study_rooms",
   "flashcards",
+  "polls",
+  "poll_votes",
   "escalated_questions",
   "student_suggestions",
 ];
