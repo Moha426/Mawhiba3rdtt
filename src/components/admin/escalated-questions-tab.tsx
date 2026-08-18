@@ -176,10 +176,11 @@ export function EscalatedQuestionsTab() {
   const subjects = ["all", ...Array.from(new Set(questions.map((q) => q.subject)))];
 
   const filteredQuestions = questions.filter((q) => {
+    if (!q) return false;
     const matchesSearch =
-      q.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      q.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (q.studentFeedback && q.studentFeedback.toLowerCase().includes(searchQuery.toLowerCase()));
+      (q.question || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (q.studentName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (q.studentFeedback && (q.studentFeedback || "").toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus = statusFilter === "all" || q.status === statusFilter;
     const matchesSubject = subjectFilter === "all" || q.subject === subjectFilter;
     return matchesSearch && matchesStatus && matchesSubject;
@@ -348,17 +349,6 @@ export function EscalatedQuestionsTab() {
                     </div>
                   )}
                 </div>
-
-                {/* AI Initial Answer */}
-                {q.aiAnswer && (
-                  <div className="bg-muted/40 p-3.5 rounded-2xl border border-border/40 text-xs text-muted-foreground">
-                    <span className="font-bold text-foreground/80 flex items-center gap-1.5 mb-1">
-                      <Bot className="h-3.5 w-3.5 text-primary" />
-                      إجابة المعلم الذكي (الروبوت) السابقة:
-                    </span>
-                    <p className="line-clamp-3 text-xs leading-relaxed">{q.aiAnswer}</p>
-                  </div>
-                )}
 
                 {/* Student Feedback note */}
                 {q.studentFeedback && (

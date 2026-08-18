@@ -488,9 +488,11 @@ export async function insertStudyFile(file: {
 
 export async function deleteStudyFile(id: string) {
   const dbInstance = getDb();
+  let deleted = null;
   if (dbInstance) {
     try {
-      return await dbInstance.delete(studyFiles).where(eq(studyFiles.id, id)).returning();
+      const res = await dbInstance.delete(studyFiles).where(eq(studyFiles.id, id)).returning();
+      if (res && res.length > 0) deleted = res[0];
     } catch (error) {
       recordDbFailure(error);
       console.warn("Cloud SQL study file delete skipped, using local store:", error);
@@ -499,7 +501,7 @@ export async function deleteStudyFile(id: string) {
 
   memoryStore.studyFiles = memoryStore.studyFiles.filter((f) => f.id !== id);
   persistStore();
-  return { success: true };
+  return deleted || { success: true };
 }
 
 export async function toggleStudyFileFavorite(id: string, isFavorite: boolean) {
@@ -608,12 +610,14 @@ export async function insertPlatform(plat: {
 
 export async function deletePlatform(id: string) {
   const dbInstance = getDb();
+  let deleted = null;
   if (dbInstance) {
     try {
-      return await dbInstance
+      const res = await dbInstance
         .delete(educationalPlatforms)
         .where(eq(educationalPlatforms.id, id))
         .returning();
+      if (res && res.length > 0) deleted = res[0];
     } catch (error) {
       recordDbFailure(error);
       console.warn("Cloud SQL platform delete skipped, using local store:", error);
@@ -622,7 +626,7 @@ export async function deletePlatform(id: string) {
 
   memoryStore.educationalPlatforms = memoryStore.educationalPlatforms.filter((p) => p.id !== id);
   persistStore();
-  return { success: true };
+  return deleted || { success: true };
 }
 
 export async function togglePlatformFavorite(id: string, isFavorite: boolean) {
@@ -718,9 +722,11 @@ export async function insertFlashcard(fc: {
 
 export async function deleteFlashcard(id: string) {
   const dbInstance = getDb();
+  let deleted = null;
   if (dbInstance) {
     try {
-      return await dbInstance.delete(flashcards).where(eq(flashcards.id, id)).returning();
+      const res = await dbInstance.delete(flashcards).where(eq(flashcards.id, id)).returning();
+      if (res && res.length > 0) deleted = res[0];
     } catch (error) {
       recordDbFailure(error);
       console.warn("Cloud SQL flashcard delete skipped, using local store:", error);
@@ -729,7 +735,7 @@ export async function deleteFlashcard(id: string) {
 
   memoryStore.flashcards = memoryStore.flashcards.filter((c) => c.id !== id);
   persistStore();
-  return { success: true };
+  return deleted || { success: true };
 }
 
 // ================= COMMUNITY CHANNELS QUERIES =================
@@ -854,9 +860,11 @@ export async function updateCommunityChannel(
 
 export async function deleteCommunityChannel(id: string) {
   const dbInstance = getDb();
+  let deleted = null;
   if (dbInstance) {
     try {
-      return await dbInstance.delete(communityChannels).where(eq(communityChannels.id, id)).returning();
+      const res = await dbInstance.delete(communityChannels).where(eq(communityChannels.id, id)).returning();
+      if (res && res.length > 0) deleted = res[0];
     } catch (error) {
       recordDbFailure(error);
       console.warn("Cloud SQL community channel delete skipped, using local store:", error);
@@ -865,7 +873,7 @@ export async function deleteCommunityChannel(id: string) {
 
   memoryStore.communityChannels = memoryStore.communityChannels.filter((c) => c.id !== id);
   persistStore();
-  return { success: true };
+  return deleted || { success: true };
 }
 
 // ================= ESCALATED QUESTIONS QUERIES =================
@@ -892,12 +900,14 @@ export async function insertEscalatedQuestion(data: {
   studentName: string;
   studentGrade?: string;
   subject?: string;
-  question: string;
+  question?: string;
+  questionText?: string;
   imageUrl?: string;
   aiAnswer?: string;
   studentFeedback?: string;
 }) {
   const dbInstance = getDb();
+  const qText = data.question || data.questionText || "سؤال موهبة";
   if (dbInstance) {
     try {
       const inserted = await dbInstance
@@ -906,7 +916,7 @@ export async function insertEscalatedQuestion(data: {
           studentName: data.studentName,
           studentGrade: data.studentGrade || "ثالث ثانوي - موهبة",
           subject: data.subject || "القدرات والتحصيلي",
-          question: data.question,
+          question: qText,
           imageUrl: data.imageUrl,
           aiAnswer: data.aiAnswer,
           studentFeedback: data.studentFeedback || "يحتاج مساعدة المعلم",
@@ -921,11 +931,11 @@ export async function insertEscalatedQuestion(data: {
   }
 
   const newQuestion = {
-    id: Date.now(),
+    id: Math.floor(Math.random() * 2000000000), // Avoid exceeding Postgres integer max
     studentName: data.studentName,
     studentGrade: data.studentGrade || "ثالث ثانوي - موهبة",
     subject: data.subject || "القدرات والتحصيلي",
-    question: data.question,
+    question: qText,
     imageUrl: data.imageUrl,
     aiAnswer: data.aiAnswer,
     studentFeedback: data.studentFeedback || "يحتاج مساعدة المعلم",
@@ -952,7 +962,7 @@ export async function updateEscalatedQuestionReply(
   }
 ) {
   const dbInstance = getDb();
-  if (dbInstance) {
+  if (dbInstance && id <= 2147483647) {
     try {
       const updated = await dbInstance
         .update(escalatedQuestions)
@@ -986,9 +996,11 @@ export async function updateEscalatedQuestionReply(
 
 export async function deleteEscalatedQuestion(id: number) {
   const dbInstance = getDb();
-  if (dbInstance) {
+  let deleted = null;
+  if (dbInstance && id <= 2147483647) {
     try {
-      return await dbInstance.delete(escalatedQuestions).where(eq(escalatedQuestions.id, id)).returning();
+      const res = await dbInstance.delete(escalatedQuestions).where(eq(escalatedQuestions.id, id)).returning();
+      if (res && res.length > 0) deleted = res[0];
     } catch (error) {
       recordDbFailure(error);
       console.warn("Cloud SQL escalated question delete skipped, using local store:", error);
@@ -997,7 +1009,7 @@ export async function deleteEscalatedQuestion(id: number) {
 
   memoryStore.escalatedQuestions = memoryStore.escalatedQuestions.filter((q) => q.id !== id);
   persistStore();
-  return { success: true };
+  return deleted || { success: true };
 }
 
 // ================= SUGGESTIONS QUERIES =================
@@ -1138,9 +1150,11 @@ export async function updateSuggestion(id: string, updateData: any) {
 
 export async function deleteSuggestion(id: string) {
   const dbInstance = getDb();
+  let deleted = null;
   if (dbInstance) {
     try {
-      return await dbInstance.delete(suggestions).where(eq(suggestions.id, id)).returning();
+      const res = await dbInstance.delete(suggestions).where(eq(suggestions.id, id)).returning();
+      if (res && res.length > 0) deleted = res[0];
     } catch (error) {
       recordDbFailure(error);
       console.warn("Cloud SQL suggestion delete skipped, using local store:", error);
@@ -1149,7 +1163,7 @@ export async function deleteSuggestion(id: string) {
 
   memoryStore.suggestions = memoryStore.suggestions.filter((s) => s.id !== id);
   persistStore();
-  return { success: true };
+  return deleted || { success: true };
 }
 
 // ================= POLLS & VOTING QUERIES =================
@@ -1303,10 +1317,12 @@ export async function updatePoll(id: number, updateData: any) {
 
 export async function deletePoll(id: number) {
   const dbInstance = getDb();
+  let deleted = null;
   if (dbInstance) {
     try {
       await dbInstance.delete(pollVotes).where(eq(pollVotes.pollId, id));
-      return await dbInstance.delete(polls).where(eq(polls.id, id)).returning();
+      const res = await dbInstance.delete(polls).where(eq(polls.id, id)).returning();
+      if (res && res.length > 0) deleted = res[0];
     } catch (error) {
       recordDbFailure(error);
       console.warn("Cloud SQL poll delete skipped, using local store:", error);
@@ -1316,7 +1332,7 @@ export async function deletePoll(id: number) {
   memoryStore.pollVotes = memoryStore.pollVotes.filter((v) => Number(v.pollId) !== Number(id));
   memoryStore.polls = memoryStore.polls.filter((p) => Number(p.id) !== Number(id));
   persistStore();
-  return { success: true };
+  return deleted || { success: true };
 }
 
 export async function getPollVotes(pollId: number) {

@@ -103,7 +103,7 @@ export function PollsTab() {
       if (filterStatus === "action" && p.type !== "action") return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        return p.question.toLowerCase().includes(q) || (p.category && p.category.toLowerCase().includes(q));
+        return (p.question || "").toLowerCase().includes(q) || (p.category && (p.category || "").toLowerCase().includes(q));
       }
       return true;
     });

@@ -486,7 +486,31 @@ async function startServer() {
   app.get("/api/suggestions", async (_req, res) => {
     try {
       const list = await getAllSuggestions();
-      res.json(list);
+      const mapped = list.map((item: any) => {
+        let likes = 0;
+        try {
+          if (item.data) {
+            const parsed = typeof item.data === "string" ? JSON.parse(item.data) : item.data;
+            if (typeof parsed.likes === "number") {
+              likes = parsed.likes;
+            }
+          }
+        } catch {}
+        return {
+          id: String(item.id),
+          studentId: String(item.studentId || ""),
+          studentName: item.studentName || "طالب موهبة",
+          title: item.title,
+          content: item.description || "",
+          category: item.category || "عام",
+          status: item.status || "pending",
+          adminResponse: item.adminReply || null,
+          likes: likes,
+          createdAt: item.createdAt ? new Date(item.createdAt).toISOString() : new Date().toISOString(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt).toISOString() : new Date().toISOString(),
+        };
+      });
+      res.json(mapped);
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to fetch suggestions" });
     }
@@ -497,12 +521,65 @@ async function startServer() {
       const items = Array.isArray(req.body) ? req.body : [req.body];
       const results = [];
       for (const item of items) {
-        if (item && item.id) {
-          const inserted = await insertSuggestion(item);
+        if (item) {
+          const id = item.id || "sug_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+          
+          let dataObj: any = {};
+          if (item.data) {
+            try {
+              dataObj = typeof item.data === "string" ? JSON.parse(item.data) : item.data;
+            } catch {}
+          }
+          if (typeof item.likes === "number") {
+            dataObj.likes = item.likes;
+          } else if (dataObj.likes === undefined) {
+            dataObj.likes = 0;
+          }
+
+          const payload = {
+            id: id,
+            type: item.type || "suggestion",
+            title: item.title,
+            category: item.category || "عام",
+            description: item.content || item.description || "",
+            data: dataObj,
+            studentId: item.studentId,
+            studentName: item.studentName,
+            status: item.status || "pending",
+            adminReply: item.adminResponse || item.adminReply || null,
+          };
+
+          const inserted = await insertSuggestion(payload);
           results.push(inserted);
         }
       }
-      res.json({ success: true, count: results.length, data: results });
+      
+      const mappedResults = results.map((item: any) => {
+        let likes = 0;
+        try {
+          if (item.data) {
+            const parsed = typeof item.data === "string" ? JSON.parse(item.data) : item.data;
+            if (typeof parsed.likes === "number") {
+              likes = parsed.likes;
+            }
+          }
+        } catch {}
+        return {
+          id: String(item.id),
+          studentId: String(item.studentId || ""),
+          studentName: item.studentName || "طالب موهبة",
+          title: item.title,
+          content: item.description || "",
+          category: item.category || "عام",
+          status: item.status || "pending",
+          adminResponse: item.adminReply || null,
+          likes: likes,
+          createdAt: item.createdAt ? new Date(item.createdAt).toISOString() : new Date().toISOString(),
+          updatedAt: item.updatedAt ? new Date(item.updatedAt).toISOString() : new Date().toISOString(),
+        };
+      });
+
+      res.json(mappedResults.length === 1 ? mappedResults[0] : mappedResults);
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to save suggestions" });
     }
@@ -511,8 +588,61 @@ async function startServer() {
   app.put("/api/suggestions/:id", async (req, res) => {
     try {
       const id = req.params.id;
-      const updated = await updateSuggestion(id, req.body);
-      res.json(updated);
+      const body = req.body;
+      
+      const list = await getAllSuggestions();
+      const existing = list.find((s: any) => String(s.id) === String(id));
+      
+      let dataObj: any = {};
+      if (existing && existing.data) {
+        try {
+          dataObj = typeof existing.data === "string" ? JSON.parse(existing.data) : existing.data;
+        } catch {}
+      }
+      
+      if (typeof body.likes === "number") {
+        dataObj.likes = body.likes;
+      }
+      
+      const payload: any = {};
+      if (body.title !== undefined) payload.title = body.title;
+      if (body.category !== undefined) payload.category = body.category;
+      if (body.content !== undefined) payload.description = body.content;
+      if (body.description !== undefined) payload.description = body.description;
+      if (body.status !== undefined) payload.status = body.status;
+      if (body.adminResponse !== undefined) payload.adminReply = body.adminResponse;
+      if (body.adminReply !== undefined) payload.adminReply = body.adminReply;
+      
+      payload.data = dataObj;
+      
+      const updated = await updateSuggestion(id, payload);
+      
+      if (updated) {
+        let likes = 0;
+        try {
+          if (updated.data) {
+            const parsed = typeof updated.data === "string" ? JSON.parse(updated.data) : updated.data;
+            if (typeof parsed.likes === "number") {
+              likes = parsed.likes;
+            }
+          }
+        } catch {}
+        res.json({
+          id: String(updated.id),
+          studentId: String(updated.studentId || ""),
+          studentName: updated.studentName || "طالب موهبة",
+          title: updated.title,
+          content: updated.description || "",
+          category: updated.category || "عام",
+          status: updated.status || "pending",
+          adminResponse: updated.adminReply || null,
+          likes: likes,
+          createdAt: updated.createdAt ? new Date(updated.createdAt).toISOString() : new Date().toISOString(),
+          updatedAt: updated.updatedAt ? new Date(updated.updatedAt).toISOString() : new Date().toISOString(),
+        });
+      } else {
+        res.status(440).json({ error: "Suggestion not found" });
+      }
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to update suggestion" });
     }

@@ -142,9 +142,9 @@ export function ChannelsTab() {
     const list = Array.isArray(channels) ? channels : [];
     return list.filter((c) => {
       const matchSearch =
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        (c.desc && c.desc.toLowerCase().includes(search.toLowerCase())) ||
-        c.category.toLowerCase().includes(search.toLowerCase());
+        (c.name || "").toLowerCase().includes((search || "").toLowerCase()) ||
+        (c.desc && (c.desc || "").toLowerCase().includes((search || "").toLowerCase())) ||
+        (c.category || "").toLowerCase().includes((search || "").toLowerCase());
       const matchCat = selectedCategory === "الكل" || c.category === selectedCategory;
       return matchSearch && matchCat;
     });
