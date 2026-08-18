@@ -30,6 +30,7 @@ import FlashcardsPage from "@/pages/flashcards";
 import AITutorPage from "@/pages/ai-tutor";
 import ChannelsPage from "@/pages/channels";
 import { AppLogo } from "@/components/app-logo";
+import { Analytics } from '@vercel/analytics/react';
 
 const queryClient = new QueryClient();
 
@@ -369,6 +370,7 @@ function App() {
       <WouterRouter base={basePath}>
         <RootApp />
       </WouterRouter>
+      <Analytics />
     </ThemeProvider>
   );
 }
