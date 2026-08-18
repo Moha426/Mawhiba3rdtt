@@ -28,6 +28,7 @@ import {
   Globe,
   Bot,
   FolderDown,
+  Edit3,
   Sparkles,
   Languages,
   LayoutGrid,
@@ -403,14 +404,26 @@ export function Layout({ children }: LayoutProps) {
                 <span className="text-[10px] text-muted-foreground truncate">@{studentProfile.username}</span>
               </div>
             </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-            </Button>
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => window.dispatchEvent(new Event("open-student-name-modal"))}
+                className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg"
+                title="تعديل الاسم"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleLogout}
+                className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                title="تسجيل الخروج"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </motion.div>
         ) : (
           <motion.div

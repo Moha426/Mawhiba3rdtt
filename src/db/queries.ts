@@ -1297,6 +1297,7 @@ export async function insertPoll(data: any) {
     actionExecutedBy: data.actionExecutedBy || null,
     actionExecutedAt: data.actionExecutedAt ? new Date(data.actionExecutedAt) : null,
     showVoterNames: data.showVoterNames !== false,
+    hidePeerResponses: Boolean(data.hidePeerResponses),
     expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
   };
 
@@ -1359,6 +1360,7 @@ export async function updatePoll(id: number, updateData: any) {
         cleanUpdate.actionExecutedAt = updateData.actionExecutedAt ? new Date(updateData.actionExecutedAt) : null;
       }
       if (updateData.showVoterNames !== undefined) cleanUpdate.showVoterNames = updateData.showVoterNames;
+      if (updateData.hidePeerResponses !== undefined) cleanUpdate.hidePeerResponses = Boolean(updateData.hidePeerResponses);
       if (updateData.expiresAt !== undefined) {
         cleanUpdate.expiresAt = updateData.expiresAt ? new Date(updateData.expiresAt) : null;
       }

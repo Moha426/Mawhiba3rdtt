@@ -28,6 +28,7 @@ export interface Poll {
   actionExecutedBy?: string | null;
   actionExecutedAt?: string | null;
   showVoterNames?: boolean;
+  hidePeerResponses?: boolean;
   expiresAt?: string | null;
   createdAt: string;
   updatedAt?: string;

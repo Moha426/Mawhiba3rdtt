@@ -163,6 +163,7 @@ export const polls = pgTable("polls", {
   actionExecutedBy: text("action_executed_by"),
   actionExecutedAt: timestamp("action_executed_at"),
   showVoterNames: boolean("show_voter_names").default(true),
+  hidePeerResponses: boolean("hide_peer_responses").default(false),
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

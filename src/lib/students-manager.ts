@@ -42,7 +42,7 @@ export function saveLocalStudents(students: StudentRecord[]) {
 /**
  * Register a new student or update existing profile in state & Firestore
  */
-export async function registerOrUpdateStudent(params: {
+export async function registerOrUpdateStudent(input: string | {
   displayName: string;
   username?: string;
   email?: string;
@@ -51,11 +51,13 @@ export async function registerOrUpdateStudent(params: {
   points?: number;
   level?: number;
 }): Promise<StudentRecord> {
+  const params = typeof input === "string" ? { displayName: input, username: input } : input;
   const current = getLocalStudents();
   
+  const rawDisplayName = (params.displayName || "").trim() || "طالب";
   let numericId = params.id;
   if (!numericId) {
-    const seed = params.email || params.username || params.displayName;
+    const seed = params.email || params.username || rawDisplayName;
     let hash = 0;
     for (let i = 0; i < seed.length; i++) {
       hash = (hash << 5) - hash + seed.charCodeAt(i);
@@ -64,12 +66,12 @@ export async function registerOrUpdateStudent(params: {
     numericId = Math.abs(hash) || Math.floor(1000 + Math.random() * 9000);
   }
 
-  const cleanUsername = params.username?.trim() || params.email?.split("@")[0] || params.displayName.replace(/\s+/g, "_").toLowerCase();
+  const cleanUsername = params.username?.trim() || params.email?.split("@")[0] || rawDisplayName.replace(/\s+/g, "_").toLowerCase();
 
   const student: StudentRecord = {
     id: numericId,
     username: cleanUsername,
-    displayName: params.displayName.trim(),
+    displayName: rawDisplayName,
     email: params.email?.trim() || `${cleanUsername}@talented.app`,
     password: params.password || "123456",
     role: "student",

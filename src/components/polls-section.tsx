@@ -26,7 +26,11 @@ import {
   Layers,
   PlusCircle,
   Edit3,
-  Trash2
+  Trash2,
+  Lock,
+  Eye,
+  EyeOff,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +44,7 @@ import {
   withdrawPollVoteApi,
   updatePollVoteByIdApi,
   deletePollVoteByIdApi,
+  updatePollApi,
   type PollWithStats
 } from "@/lib/polls";
 
@@ -61,6 +66,37 @@ export function PollsSection({ className = "", limit, showAllLink = false }: Pol
   const [submittingPollId, setSubmittingPollId] = useState<number | null>(null);
   const [editingVoteId, setEditingVoteId] = useState<number | null>(null);
   const [editingText, setEditingText] = useState<string>("");
+
+  const isAdmin = localStorage.getItem("isAdmin") === "true";
+  const [globalHidePeers, setGlobalHidePeers] = useState(() => {
+    return localStorage.getItem("global_hide_peer_responses") === "true";
+  });
+
+  const handleToggleGlobalHidePeers = () => {
+    const next = !globalHidePeers;
+    setGlobalHidePeers(next);
+    localStorage.setItem("global_hide_peer_responses", String(next));
+    toast({
+      title: next ? "تم إخفاء رسائل الطلاب 🙈" : "تم إظهار رسائل الطلاب 👁️",
+      description: next
+        ? "لن يرى الطلاب إجابات زملائهم الآخرين في الاستطلاعات (خاصة بالمشرف)"
+        : "يمكن للطلاب الآن الاطلاع على مشاركات زملائهم",
+    });
+  };
+
+  const handleToggleHidePeersForPoll = async (poll: PollWithStats) => {
+    try {
+      const next = !poll.hidePeerResponses;
+      await updatePollApi(poll.id, { hidePeerResponses: next });
+      toast({
+        title: next ? "تم إخفاء إجابات هذا الاستطلاع 🙈" : "تم إظهار إجابات هذا الاستطلاع للجميع 👁️",
+        description: next ? "سيرى المشرف فقط استجابات الطلاب لهذا السؤال" : "أصبحت الإجابات مرئية لجميع الطلاب",
+      });
+      await refreshPolls();
+    } catch (err: any) {
+      toast({ title: "فشل التعديل", description: err.message, variant: "destructive" });
+    }
+  };
 
   const currentUserName = useMemo(() => {
     return profile?.name || user?.email?.split("@")[0] || "طالب موهبة";
@@ -289,6 +325,34 @@ export function PollsSection({ className = "", limit, showAllLink = false }: Pol
           </Button>
         </div>
       </div>
+
+      {/* Admin Supervisor Control Bar */}
+      {isAdmin && (
+        <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/25 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-purple-950 dark:text-purple-200">
+            <Shield className="h-4 w-4 text-purple-600 shrink-0" />
+            <div>
+              <span className="font-extrabold block">خيار المشرف: إظهار أو إخفاء رسائل الطلاب لجميع الاستطلاعات</span>
+              <span className="text-[11px] text-purple-800/80 dark:text-purple-300/80">
+                {globalHidePeers
+                  ? "الحالة الحالية: رسائل الطلاب مخفية عن بعضهم وتظهر لك كمشرف فقط 🙈"
+                  : "الحالة الحالية: رسائل الطلاب مرئية لجميع الطلاب 👁️"}
+              </span>
+            </div>
+          </div>
+          <Button
+            variant={globalHidePeers ? "default" : "outline"}
+            size="sm"
+            onClick={handleToggleGlobalHidePeers}
+            className={`rounded-xl text-xs font-bold gap-1.5 h-8 shrink-0 ${
+              globalHidePeers ? "bg-purple-600 text-white hover:bg-purple-700" : "border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-300"
+            }`}
+          >
+            {globalHidePeers ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            <span>{globalHidePeers ? "إظهار للجميع" : "إخفاء عن الطلاب"}</span>
+          </Button>
+        </div>
+      )}
 
       {/* Poll Cards List */}
       {displayedPolls.length === 0 ? (
@@ -728,15 +792,47 @@ export function PollsSection({ className = "", limit, showAllLink = false }: Pol
                       )}
 
                       {/* Display Recent Peer Answers from OTHER users */}
-                      {poll.votes.filter((v) => Boolean(v.textAnswer) && v.userId !== currentUserId).length > 0 && (
-                        <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                          <p className="text-[11px] font-bold text-muted-foreground">
-                            مشاركات الطلاب الآخرين ({poll.votes.filter((v) => Boolean(v.textAnswer) && v.userId !== currentUserId).length}):
-                          </p>
-                          {poll.votes
-                            .filter((v) => Boolean(v.textAnswer) && v.userId !== currentUserId)
-                            .slice(0, 6)
-                            .map((v, idx) => (
+                      {(() => {
+                        const peerVotes = poll.votes.filter((v) => Boolean(v.textAnswer) && v.userId !== currentUserId);
+                        const isHiddenByAdmin = Boolean(poll.hidePeerResponses || globalHidePeers);
+                        const canSeePeerResponses = !isHiddenByAdmin || isAdmin;
+
+                        if (peerVotes.length === 0) return null;
+
+                        if (!canSeePeerResponses) {
+                          return (
+                            <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-900 dark:text-purple-200 flex items-center gap-2">
+                              <Lock className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+                              <span>قام المشرف بإخفاء مشاركات الطلاب الآخرين للحفاظ على الخصوصية (تظهر استجابتك فقط).</span>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                            <div className="flex items-center justify-between">
+                              <p className="text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
+                                <span>مشاركات الطلاب الآخرين ({peerVotes.length}):</span>
+                                {isHiddenByAdmin && isAdmin && (
+                                  <Badge variant="outline" className="text-[9px] text-purple-600 border-purple-300 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0">
+                                    مخفية عن الطلاب (للمشرف فقط)
+                                  </Badge>
+                                )}
+                              </p>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleHidePeersForPoll(poll)}
+                                  className="h-6 text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 rounded-lg px-2 gap-1"
+                                >
+                                  {poll.hidePeerResponses ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                                  <span>{poll.hidePeerResponses ? "إظهار للجميع" : "إخفاء عن الطلاب"}</span>
+                                </Button>
+                              )}
+                            </div>
+
+                            {peerVotes.slice(0, 10).map((v, idx) => (
                               <div
                                 key={v.id || idx}
                                 className="p-2 rounded-xl bg-muted/30 border border-border/40 text-[11px] flex items-start justify-between gap-2"
@@ -745,8 +841,9 @@ export function PollsSection({ className = "", limit, showAllLink = false }: Pol
                                 <span className="text-[10px] text-muted-foreground shrink-0">{v.userName}</span>
                               </div>
                             ))}
-                        </div>
-                      )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

@@ -7,6 +7,7 @@ import { Layout } from "@/components/layout";
 import { ThemeProvider } from "@/lib/theme";
 import { AnimatePresence, motion } from "framer-motion";
 import { Chatbot } from "@/components/chatbot";
+import { StudentNamePromptModal } from "@/components/student-name-prompt-modal";
 import { AuthProvider } from "@/lib/auth";
 import { SignInForm } from "@/pages/sign-in";
 import { SignUpForm } from "@/pages/sign-up";
@@ -353,6 +354,7 @@ function RootApp() {
       <AuthProvider>
         <TooltipProvider>
           <AppRouter />
+          <StudentNamePromptModal />
           <Chatbot />
           <Toaster />
         </TooltipProvider>

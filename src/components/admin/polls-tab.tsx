@@ -79,6 +79,7 @@ export function PollsTab() {
   const [formAllowMultiple, setFormAllowMultiple] = useState(false);
   const [formPreventWithdraw, setFormPreventWithdraw] = useState(false);
   const [formIsPinned, setFormIsPinned] = useState(false);
+  const [formHidePeerResponses, setFormHidePeerResponses] = useState(false);
   
   // Expiry Duration Mode: 'never' (infinite) | '1h' | '24h' | '3d' | '7d' | '14d' | '30d' | 'custom_days' | 'custom_hours' | 'custom_datetime'
   const [formExpiryMode, setFormExpiryMode] = useState<string>("14d");
@@ -118,6 +119,7 @@ export function PollsTab() {
     setFormAllowMultiple(false);
     setFormPreventWithdraw(false);
     setFormIsPinned(false);
+    setFormHidePeerResponses(false);
     setFormExpiryMode("14d");
     setFormCustomDays("7");
     setFormCustomHours("12");
@@ -138,6 +140,7 @@ export function PollsTab() {
     setFormAllowMultiple(Boolean(template.allowMultiple));
     setFormPreventWithdraw(Boolean(template.preventWithdraw));
     setFormIsPinned(Boolean(template.isPinned));
+    setFormHidePeerResponses(Boolean(template.hidePeerResponses));
     setFormExpiryMode("never");
     setFormCustomDays("7");
     setFormCustomHours("12");
@@ -158,6 +161,7 @@ export function PollsTab() {
     setFormAllowMultiple(Boolean(poll.allowMultiple));
     setFormPreventWithdraw(Boolean(poll.preventWithdraw));
     setFormIsPinned(Boolean(poll.isPinned));
+    setFormHidePeerResponses(Boolean(poll.hidePeerResponses));
     
     if (!poll.expiresAt) {
       setFormExpiryMode("never");
@@ -287,6 +291,7 @@ export function PollsTab() {
       allowMultiple: formAllowMultiple,
       preventWithdraw: formPreventWithdraw,
       isPinned: formIsPinned,
+      hidePeerResponses: formHidePeerResponses,
       expiresAt: calculatedExpiresAt,
       correctOptionIndex: formType === "quiz" ? formCorrectIndex : null,
       quizExplanation: formType === "quiz" ? formQuizExplanation.trim() : null,
@@ -1042,6 +1047,18 @@ export function PollsTab() {
                     </p>
                   </div>
                   <Switch id="prevent-with" checked={formPreventWithdraw} onCheckedChange={setFormPreventWithdraw} />
+                </div>
+
+                <div className="sm:col-span-2 flex items-center justify-between p-3 rounded-xl bg-purple-500/10 border border-purple-500/25">
+                  <div className="space-y-0.5">
+                    <Label className="text-xs font-extrabold text-purple-950 dark:text-purple-200 cursor-pointer block" htmlFor="hide-peers">
+                      🙈 إخفاء رسائل وإجابات الطلاب الآخرين عن زملائهم (خيار المشرف)
+                    </Label>
+                    <p className="text-[10.5px] text-purple-800/80 dark:text-purple-300/80">
+                      عند التفعيل: سيرى كل طالب إجابته فقط، ولا يستطيع الطلاب رؤية إجابات ومشاركات زملائهم (المشرف فقط يطلع عليها).
+                    </p>
+                  </div>
+                  <Switch id="hide-peers" checked={formHidePeerResponses} onCheckedChange={setFormHidePeerResponses} />
                 </div>
               </div>
             </div>
