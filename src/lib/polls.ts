@@ -153,7 +153,7 @@ export async function fetchPollsApi(): Promise<Poll[]> {
     const res = await fetch("/api/polls");
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         try {
           localStorage.setItem(LOCAL_POLLS_KEY, JSON.stringify(data));
         } catch {}
@@ -168,11 +168,11 @@ export async function fetchPollsApi(): Promise<Poll[]> {
     const cached = localStorage.getItem(LOCAL_POLLS_KEY);
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch {}
 
-  return [];
+  return SAMPLE_POLL_TEMPLATES;
 }
 
 export async function fetchPollVotesApi(pollId: number): Promise<PollVote[]> {

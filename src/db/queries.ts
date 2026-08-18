@@ -263,7 +263,79 @@ const initialEscalatedQuestions = [
   },
 ];
 
-const initialPolls: any[] = [];
+const initialPolls: any[] = [
+  {
+    id: 1,
+    question: "ما هو الوقت الأنسب لجدولة حصص المراجعة المكثفة لاختبار القدرات والتحصيلي القادم؟",
+    options: JSON.stringify([
+      "العصر (من 4:00 إلى 5:30 عصراً)",
+      "المساء (من 7:30 إلى 9:00 مساءً)",
+      "عطلة نهاية الأسبوع (السبت صباحاً)",
+      "تسجيلات مرئية متاحة في أي وقت"
+    ]),
+    status: "active",
+    type: "choice",
+    category: "تنظيمي وجداول",
+    imageUrl: null,
+    isPublic: true,
+    totalVotes: 0,
+    allowMultiple: false,
+    preventWithdraw: false,
+    isPinned: true,
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 2,
+    question: "قرار تنفيذي: هل تؤيد اعتماد يوم السبت كيوم تدريب حر وتجميعات إضافية؟",
+    options: JSON.stringify(["نعم، أؤيد بشدة ونحتاج حصص تجميعات", "لا، أفضل الاكتفاء بأيام الأسبوع"]),
+    status: "active",
+    type: "action",
+    category: "قرارات وفعاليات",
+    actionTitle: "تثبيت حصص التجميعات الحرة يوم السبت في الجدول الدراسي",
+    actionDescription: "في حال وصول نسبة التأييد لأكثر من 60% سيتم إدراج الرابط في الجدول وتنبيه المعلمين.",
+    actionStatus: "pending",
+    imageUrl: null,
+    isPublic: true,
+    totalVotes: 0,
+    allowMultiple: false,
+    preventWithdraw: false,
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString(),
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 3,
+    question: "تحدي اليوم (قدرات كمي): إذا كان 4x + 3 = 19، فما قيمة 2x - 1؟",
+    options: JSON.stringify(["5", "7", "9", "11"]),
+    status: "active",
+    type: "quiz",
+    category: "تحدي وتنافس",
+    correctOptionIndex: 1,
+    quizExplanation: "الحل: 4x = 19 - 3 = 16 => x = 4. بالتعويض: 2(4) - 1 = 8 - 1 = 7. أحسنت!",
+    imageUrl: null,
+    isPublic: true,
+    totalVotes: 0,
+    allowMultiple: false,
+    preventWithdraw: true,
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 10).toISOString(),
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 4,
+    question: "صندوق الأفكار والاستبيان العام: ما هي الميزة أو التجميعة التي تقترح إضافتها للمكتبة والمنصة؟",
+    options: JSON.stringify([]),
+    status: "active",
+    type: "text",
+    category: "استبيانات وملاحظات",
+    imageUrl: null,
+    isPublic: true,
+    totalVotes: 0,
+    allowMultiple: false,
+    preventWithdraw: false,
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
+    createdAt: new Date().toISOString(),
+  },
+];
 const initialPollVotes: any[] = [];
 
 let memoryStore: LocalStore = {
@@ -274,8 +346,8 @@ let memoryStore: LocalStore = {
   communityChannels: initialChannels,
   escalatedQuestions: initialEscalatedQuestions,
   suggestions: [],
-  polls: [],
-  pollVotes: [],
+  polls: initialPolls,
+  pollVotes: initialPollVotes,
 };
 
 // Try loading persisted file store
