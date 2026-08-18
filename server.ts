@@ -47,26 +47,42 @@ import {
   generateStudyPlanWithGemini
 } from "./src/server/gemini-tutor";
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+export const app = express();
+let isAppInitialized = false;
+
+export async function createServer() {
+  if (isAppInitialized) return app;
+  isAppInitialized = true;
+  
+  const PORT = process.env.PORT || 3000;
 
   // Initialize firebase-admin
-  let firestoreDb: admin.firestore.Firestore | null = null;
+  let firestoreDb: any = null;
   try {
+    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+    let firestoreDbId: string | undefined;
     if (admin.apps.length === 0) {
-      const configPath = path.join(process.cwd(), "firebase-applet-config.json");
       if (fs.existsSync(configPath)) {
         const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
         admin.initializeApp({
           projectId: config.projectId,
         });
+        firestoreDbId = config.firestoreDatabaseId;
         console.log("Firebase Admin initialized with project ID:", config.projectId);
       } else {
         admin.initializeApp();
       }
+    } else if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      firestoreDbId = config.firestoreDatabaseId;
     }
-    firestoreDb = admin.firestore();
+    
+    if (firestoreDbId) {
+      const { getFirestore } = await import("firebase-admin/firestore");
+      firestoreDb = getFirestore(admin.app(), firestoreDbId);
+    } else {
+      firestoreDb = admin.firestore();
+    }
     
     // Load backend data if Cloud SQL is missing
     if (!isCloudSqlConfigured()) {
@@ -833,10 +849,14 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    const engineName = isCloudSqlConfigured() ? "Cloud SQL PostgreSQL backend" : "Resilient Local Database Storage";
-    console.log(`Server running on http://0.0.0.0:${PORT} with ${engineName}`);
-  });
+  if (process.env.VERCEL !== "1") {
+    app.listen(PORT, "0.0.0.0", () => {
+      const engineName = isCloudSqlConfigured() ? "Cloud SQL PostgreSQL backend" : "Resilient Local Database Storage";
+      console.log(`Server running on http://0.0.0.0:${PORT} with ${engineName}`);
+    });
+  }
+  
+  return app;
 }
 
 // Global error handlers for resilience in production
@@ -848,7 +868,9 @@ process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception caught (non-fatal):", err);
 });
 
-startServer().catch((err) => {
-  console.error("CRITICAL: Failed to start server:", err);
-});
+if (process.env.VERCEL !== "1") {
+  createServer().catch((err) => {
+    console.error("CRITICAL: Failed to start server:", err);
+  });
+}
 
