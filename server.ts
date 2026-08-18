@@ -1,8 +1,6 @@
-import "dotenv/config";
 import express from "express";
 import path from "path";
 import fs from "fs";
-import admin from "firebase-admin";
 import { isCloudSqlConfigured } from "./src/db/index";
 import {
   getOrCreateUser,
@@ -46,12 +44,15 @@ import {
   generateStudyPlanWithGemini
 } from "./src/server/gemini-tutor";
 
-export const app = express();
+let appInstance: any = null;
 let isAppInitialized = false;
 
 export async function createServer() {
-  if (isAppInitialized) return app;
+  if (isAppInitialized) return appInstance;
   isAppInitialized = true;
+  
+  const app = express();
+  appInstance = app;
   
   const PORT = process.env.PORT || 3000;
 
