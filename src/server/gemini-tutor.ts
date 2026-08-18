@@ -3,9 +3,14 @@ import { GoogleGenAI } from "@google/genai";
 let aiClient: GoogleGenAI | null = null;
 
 function getAIClient(): GoogleGenAI | null {
-  if (!aiClient && process.env.GEMINI_API_KEY) {
+  if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("CRITICAL: GEMINI_API_KEY is missing from environment variables. AI features will not work.");
+      return null;
+    }
     aiClient = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
+      apiKey,
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',
@@ -366,8 +371,13 @@ ${questionText.trim()}
     };
   }
 
-  // Dynamic general fallback generator to provide high-quality responses even under total API key quota block
-  let dynamicAnswer = `مرحباً بك يا بطل! لقد استقبلت سؤالك بكل سرور. نظراً لوجود ضغط كبير على حصة الطلبات المجانية لليوم (الحد الأقصى لليوم هو 20 طلباً مجانياً)، قمت بتفعيل نظام المساعدة التعليمي الاحتياطي للإجابة على سؤالك وتبسيط الفكرة لك مباشرة:\n\n`;
+  // Dynamic general fallback generator to provide high-quality responses even under total API key quota block or missing config
+  let dynamicAnswer = "";
+  if (!process.env.GEMINI_API_KEY) {
+    dynamicAnswer = `**تنبيه للنظام**: يبدو أن مفتاح API الخاص بـ Gemini غير مهيأ في إعدادات Vercel أو البيئة الحالية. يرجى إضافة \`GEMINI_API_KEY\` ليعمل الذكاء الاصطناعي بكامل قوته.\n\n`;
+  }
+  
+  dynamicAnswer += `مرحباً بك يا بطل! لقد استقبلت سؤالك بكل سرور. نظراً لوجود ضغط كبير على حصة الطلبات المجانية لليوم (الحد الأقصى لليوم هو 20 طلباً مجانياً)، قمت بتفعيل نظام المساعدة التعليمي الاحتياطي للإجابة على سؤالك وتبسيط الفكرة لك مباشرة:\n\n`;
   let dynamicSteps: string[];
   let dynamicRule = "استراتيجية التفكير المنطقي والتحليل السليم لحل مسائل قياس وموهبة.";
   let dynamicShortcut = "اقرأ السؤال بدقة، حدد المعطيات، وابحث عن أقصر طريق للوصول للحل المباشر.";
