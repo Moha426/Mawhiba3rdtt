@@ -49,6 +49,269 @@ import {
 
 import { usePersistentState } from "@/lib/api-client-react";
 
+function formatSuperscripts(text: string, keyPrefix: string) {
+  const parts = text.split(/\^([0-9a-zA-Z+-]+)/g);
+  return parts.map((part, index) => {
+    const isSuper = index % 2 === 1;
+    if (isSuper) {
+      return <sup key={`${keyPrefix}-super-${index}`} className="text-[10px] font-bold">{part}</sup>;
+    }
+    return <span key={`${keyPrefix}-sub-${index}`}>{part}</span>;
+  });
+}
+
+function renderLineWithMarkdown(text: string, lineIndex: number) {
+  if (!text) return [];
+
+  interface Token {
+    type: "text" | "math" | "code" | "bold" | "italic";
+    content: string;
+  }
+  
+  let tokens: Token[] = [{ type: "text", content: text }];
+  
+  // 1. Parse inline math \( ... \)
+  tokens = tokens.flatMap(t => {
+    if (t.type !== "text") return [t];
+    const subParts = t.content.split(/\\\((.*?)\\\)/g);
+    return subParts.map((sub, idx) => ({
+      type: idx % 2 === 1 ? ("math" as const) : ("text" as const),
+      content: sub,
+    }));
+  });
+  
+  // 2. Parse inline math $ ... $
+  tokens = tokens.flatMap(t => {
+    if (t.type !== "text") return [t];
+    const subParts = t.content.split(/\$([^\$]+)\$/g);
+    return subParts.map((sub, idx) => ({
+      type: idx % 2 === 1 ? ("math" as const) : ("text" as const),
+      content: sub,
+    }));
+  });
+
+  // 3. Parse inline code ` ... `
+  tokens = tokens.flatMap(t => {
+    if (t.type !== "text") return [t];
+    const subParts = t.content.split(/`([^`]+)`/g);
+    return subParts.map((sub, idx) => ({
+      type: idx % 2 === 1 ? ("code" as const) : ("text" as const),
+      content: sub,
+    }));
+  });
+
+  // 4. Parse bold ** ... **
+  tokens = tokens.flatMap(t => {
+    if (t.type !== "text") return [t];
+    const subParts = t.content.split(/\*\*(.*?)\*\*/g);
+    return subParts.map((sub, idx) => ({
+      type: idx % 2 === 1 ? ("bold" as const) : ("text" as const),
+      content: sub,
+    }));
+  });
+
+  // 5. Parse italic * ... *
+  tokens = tokens.flatMap(t => {
+    if (t.type !== "text") return [t];
+    const subParts = t.content.split(/\*(.*?)\*/g);
+    return subParts.map((sub, idx) => ({
+      type: idx % 2 === 1 ? ("italic" as const) : ("text" as const),
+      content: sub,
+    }));
+  });
+
+  return tokens.map((t, idx) => {
+    const key = `line-${lineIndex}-tok-${idx}`;
+    if (t.type === "math") {
+      return (
+        <code key={key} dir="ltr" className="inline-block bg-primary/5 text-primary px-1.5 py-0.5 rounded-md text-[11px] font-mono mx-1 border border-primary/20 select-all font-black align-middle">
+          {formatSuperscripts(t.content, key)}
+        </code>
+      );
+    }
+    if (t.type === "code") {
+      return (
+        <code key={key} dir="ltr" className="inline-block bg-muted/80 text-foreground px-1.5 py-0.5 rounded-md text-[11px] font-mono mx-1 border border-border/50 select-all font-bold align-middle">
+          {formatSuperscripts(t.content, key)}
+        </code>
+      );
+    }
+    if (t.type === "bold") {
+      return (
+        <strong key={key} className="font-extrabold text-foreground bg-primary/5 px-1 rounded-sm">
+          {t.content}
+        </strong>
+      );
+    }
+    if (t.type === "italic") {
+      return (
+        <em key={key} className="italic text-foreground/90 font-semibold px-0.5">
+          {t.content}
+        </em>
+      );
+    }
+    return <span key={key}>{t.content}</span>;
+  });
+}
+
+interface MarkdownBlock {
+  type: "header" | "subheader" | "subsubheader" | "list_item" | "ordered_list_item" | "paragraph" | "code_block" | "math_block";
+  text: string;
+  level?: number;
+  number?: string;
+}
+
+function parseMarkdownToBlocks(text: string): MarkdownBlock[] {
+  if (!text) return [];
+  const blocks: MarkdownBlock[] = [];
+  const lines = text.split("\n");
+  let inCodeBlock = false;
+  let codeBlockContent: string[] = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    
+    if (trimmed.startsWith("```")) {
+      if (inCodeBlock) {
+        blocks.push({
+          type: "code_block",
+          text: codeBlockContent.join("\n"),
+        });
+        inCodeBlock = false;
+        codeBlockContent = [];
+      } else {
+        inCodeBlock = true;
+      }
+      continue;
+    }
+    
+    if (inCodeBlock) {
+      codeBlockContent.push(line);
+      continue;
+    }
+    
+    if (trimmed.startsWith("$$") && trimmed.endsWith("$$") && trimmed.length > 4) {
+      blocks.push({
+        type: "math_block",
+        text: trimmed.slice(2, -2).trim(),
+      });
+      continue;
+    }
+    
+    if (!trimmed) {
+      blocks.push({ type: "paragraph", text: "" });
+      continue;
+    }
+    
+    if (trimmed.startsWith("###")) {
+      blocks.push({
+        type: "subsubheader",
+        text: trimmed.replace(/^###\s*/, ""),
+      });
+    } else if (trimmed.startsWith("##") || trimmed.startsWith("#")) {
+      blocks.push({
+        type: "subheader",
+        text: trimmed.replace(/^##?\s*/, ""),
+      });
+    } else if (trimmed.startsWith("-") || trimmed.startsWith("*") || trimmed.startsWith("•")) {
+      blocks.push({
+        type: "list_item",
+        text: trimmed.replace(/^[-*•]\s*/, ""),
+      });
+    } else {
+      const numMatch = trimmed.match(/^(\d+)\.\s*(.*)/);
+      if (numMatch) {
+        blocks.push({
+          type: "ordered_list_item",
+          text: numMatch[2],
+          number: numMatch[1],
+        });
+      } else {
+        blocks.push({
+          type: "paragraph",
+          text: trimmed,
+        });
+      }
+    }
+  }
+  
+  if (inCodeBlock && codeBlockContent.length > 0) {
+    blocks.push({
+      type: "code_block",
+      text: codeBlockContent.join("\n"),
+    });
+  }
+  
+  return blocks;
+}
+
+function formatMarkdown(text: string) {
+  if (!text) return null;
+  const blocks = parseMarkdownToBlocks(text);
+  return (
+    <div className="space-y-2.5 text-right font-medium leading-relaxed" dir="rtl">
+      {blocks.map((block, idx) => {
+        const key = `block-${idx}`;
+        if (block.type === "code_block") {
+          return (
+            <pre key={key} dir="ltr" className="bg-muted p-3 rounded-lg overflow-x-auto text-[11px] font-mono border border-border/40 text-left my-2 font-bold select-all">
+              <code>{block.text}</code>
+            </pre>
+          );
+        }
+        if (block.type === "math_block") {
+          return (
+            <div key={key} dir="ltr" className="bg-muted/50 p-4 rounded-xl text-center text-sm font-mono border border-border/30 my-3 select-all text-primary font-black">
+              {formatSuperscripts(block.text, key)}
+            </div>
+          );
+        }
+        if (block.type === "paragraph" && !block.text) {
+          return <div key={key} className="h-2" />;
+        }
+        
+        if (block.type === "subheader") {
+          return (
+            <h3 key={key} className="text-base font-black text-foreground mt-4 flex items-center gap-1.5 border-b border-border/40 pb-1">
+              {renderLineWithMarkdown(block.text, idx)}
+            </h3>
+          );
+        }
+        if (block.type === "subsubheader") {
+          return (
+            <h4 key={key} className="text-sm font-black text-primary mt-3 flex items-center gap-1.5 border-b border-border/40 pb-1">
+              {renderLineWithMarkdown(block.text, idx)}
+            </h4>
+          );
+        }
+        if (block.type === "list_item") {
+          return (
+            <div key={key} className="flex items-start gap-2 pr-2 py-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 mt-1.5" />
+              <p className="text-xs text-muted-foreground flex-1 leading-relaxed">{renderLineWithMarkdown(block.text, idx)}</p>
+            </div>
+          );
+        }
+        if (block.type === "ordered_list_item") {
+          return (
+            <div key={key} className="flex items-start gap-2 pr-1 py-0.5">
+              <span className="text-[11px] font-extrabold text-primary shrink-0 bg-primary/10 rounded-md w-5 h-5 flex items-center justify-center mt-0.5">{block.number}</span>
+              <p className="text-xs text-muted-foreground flex-1 leading-relaxed">{renderLineWithMarkdown(block.text, idx)}</p>
+            </div>
+          );
+        }
+        
+        return (
+          <p key={key} className="text-xs text-muted-foreground leading-relaxed">
+            {renderLineWithMarkdown(block.text, idx)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 type Mode = "solver" | "quiz_gen" | "planner" | "my_questions";
 
 interface GeneratedQuestion {
@@ -701,38 +964,45 @@ export default function AITutorPage() {
                   </div>
                 ) : solverResult ? (
                   <div className="space-y-4 animate-fadeIn">
-                    {/* Final Answer */}
-                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300">
-                      <p className="text-xs font-bold mb-1 flex items-center gap-1.5">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        <span>النتيجة النهائية:</span>
+                    {/* Natural Explanation Box */}
+                    <div className="p-5 rounded-2xl bg-card border border-border/70 shadow-sm space-y-3">
+                      <p className="text-xs font-extrabold text-primary flex items-center gap-1.5 mb-2">
+                        <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+                        <span>الشرح والحل بالكامل:</span>
                       </p>
-                      <p className="text-sm font-black">{solverResult.answer}</p>
+                      
+                      {formatMarkdown(solverResult.answer)}
                     </div>
 
-                    {/* Applied Rule */}
-                    <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold flex items-center gap-2">
-                      <BookOpen className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-                      <span>{solverResult.rule}</span>
-                    </div>
-
-                    {/* Steps */}
-                    <div className="space-y-2">
-                      <p className="text-xs font-bold text-foreground">خطوات الحل والتوضيح:</p>
-                      {solverResult.steps.map((step, idx) => (
-                        <div key={idx} className="p-2.5 rounded-xl bg-muted/40 text-xs text-muted-foreground leading-relaxed">
-                          {step}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Shortcut trick */}
-                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs leading-relaxed flex items-start gap-2">
-                      <Zap className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-                      <div>
-                        <strong>تريك الحل السريع:</strong> {solverResult.shortcut}
+                    {/* Applied Rule (Only if exists in old template format) */}
+                    {solverResult.rule && (
+                      <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                        <span>{solverResult.rule}</span>
                       </div>
-                    </div>
+                    )}
+
+                    {/* Steps (Only if exists in old template format) */}
+                    {solverResult.steps && solverResult.steps.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-foreground">خطوات الحل والتوضيح:</p>
+                        {solverResult.steps.map((step, idx) => (
+                          <div key={idx} className="p-2.5 rounded-xl bg-muted/40 text-xs text-muted-foreground leading-relaxed">
+                            {step}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Shortcut trick (Only if exists in old template format) */}
+                    {solverResult.shortcut && (
+                      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs leading-relaxed flex items-start gap-2">
+                        <Zap className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                        <div>
+                          <strong>تريك الحل السريع:</strong> {solverResult.shortcut}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground text-center">
@@ -755,7 +1025,7 @@ export default function AITutorPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <Button
                       variant={hasBenefited === true ? "default" : "outline"}
                       onClick={handleBenefitSuccess}
@@ -763,6 +1033,15 @@ export default function AITutorPage() {
                     >
                       <ThumbsUp className="h-4 w-4" />
                       <span>فهمت الحل (+15 نقطة)</span>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsEscalateOpen(true)}
+                      className="h-10 rounded-xl font-bold gap-2 text-xs border-rose-500/40 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
+                    >
+                      <AlertCircle className="h-4 w-4" />
+                      <span>الاعتراض على الإجابة وإرسالها للمشرف</span>
                     </Button>
                   </div>
                 </div>
@@ -862,11 +1141,18 @@ export default function AITutorPage() {
 
                     {q.teacherReply ? (
                       <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-2xl text-xs space-y-1.5 mt-2">
-                        <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold">
-                          <UserCheck className="h-4 w-4 text-emerald-600" />
-                          <span>رد المعلم ({q.teacherName || "المعلم المشرف"}):</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold">
+                            <UserCheck className="h-4 w-4 text-emerald-600" />
+                            <span>تصحيح الشرح المعتمد من المشرف ({q.teacherName || "المشرف المعتمد"}):</span>
+                          </div>
+
+                          <Badge className="bg-emerald-600 text-white text-[10px] gap-1 font-bold">
+                            <Sparkles className="h-3 w-3" />
+                            <span>تم تدريب الـ AI بذاكرة التصحيح 🎯</span>
+                          </Badge>
                         </div>
-                        <p className="text-xs sm:text-sm text-foreground leading-relaxed whitespace-pre-line">
+                        <p className="text-xs sm:text-sm text-foreground leading-relaxed whitespace-pre-line font-medium pt-1">
                           {q.teacherReply}
                         </p>
                       </div>
@@ -1207,10 +1493,10 @@ export default function AITutorPage() {
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center gap-2 text-foreground">
               <AlertCircle className="h-5 w-5 text-rose-500" />
-              <span>إرسال المسألة إلى المعلم في لوحة التحكم</span>
+              <span>الاعتراض على الإجابة وإرسالها للمشرف للتصحيح</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              سيصل استفسارك مباشرة لصندوق أسئلة الطلاب لدى معلمي المادة ليتم وضع شرح مفصل ونموذجي لك.
+              سيصل اعتراضك مباشرة للمشرف والمدرس ليراجع الإجابة ويقوم بتصحيحها. عند اعتماد التعديل، سيوصلك التوضيح وسيتم تدريب الـ AI عليه مباشرة.
             </DialogDescription>
           </DialogHeader>
 
@@ -1254,11 +1540,11 @@ export default function AITutorPage() {
             )}
 
             <div>
-              <label className="text-xs font-bold text-muted-foreground block mb-1">لماذا لم تستفد من الشرح؟ (ملاحظتك للمعلم)</label>
+              <label className="text-xs font-bold text-muted-foreground block mb-1">سبب الاعتراض والملاحظة للمشرف (تصحيح الـ AI) *</label>
               <Textarea
                 value={escalateFeedback}
                 onChange={(e) => setEscalateFeedback(e.target.value)}
-                placeholder="مثال: لم أفهم كيفية حساب الخطوة 2، أو أحتاج مسألة تطبيقية مشابهة من تجميعات قياس..."
+                placeholder="اكتب سبب الاعتراض أو الخطأ الذي لاحظته في إجابة الـ AI والملاحظة للمشرف..."
                 rows={3}
                 className="rounded-xl text-xs resize-none"
               />

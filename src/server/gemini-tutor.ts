@@ -16,10 +16,125 @@ function getAIClient(): GoogleGenAI | null {
   return aiClient;
 }
 
+/**
+ * Robust helper with multi-model fallback and automatic retry on 503 / 429 high demand errors
+ */
+async function generateWithFallback(
+  ai: GoogleGenAI,
+  contents: any[],
+  responseMimeType: string = "application/json",
+  useSearch: boolean = false
+): Promise<string | null> {
+  const modelsToTry = [
+    "gemini-3.7-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
+    "gemini-3.1-pro-preview"
+  ];
+  
+  for (const modelName of modelsToTry) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const config: any = { responseMimeType };
+        if (useSearch) {
+          config.tools = [{ googleSearch: {} }];
+        }
+
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents,
+          config
+        });
+        if (response?.text) return response.text;
+      } catch (err: any) {
+        let errMsg: string;
+        try {
+          errMsg = [
+            err?.message,
+            err?.status,
+            err?.statusText,
+            err?.error?.message,
+            err?.error?.code,
+            typeof err === 'object' ? JSON.stringify(err) : String(err),
+            String(err)
+          ].filter(Boolean).join(" ").toLowerCase();
+        } catch (e) {
+          errMsg = String(err).toLowerCase();
+        }
+
+        const isRateLimit = 
+          err?.status === 429 || 
+          err?.error?.code === 429 || 
+          err?.statusCode === 429 ||
+          errMsg.includes("429") || 
+          errMsg.includes("quota") || 
+          errMsg.includes("limit") || 
+          errMsg.includes("exhausted");
+
+        const isUnavailable =
+          err?.status === 503 ||
+          err?.error?.code === 503 ||
+          errMsg.includes("503") ||
+          errMsg.includes("unavailable") ||
+          errMsg.includes("demand") ||
+          errMsg.includes("overloaded");
+
+        // Only log warning if we are on the last attempt of the last model
+        if (modelName === modelsToTry[modelsToTry.length - 1] && attempt === 1) {
+          console.error(`All Gemini models failed. Last error (${modelName}):`, err?.message || err);
+        } else if (isRateLimit || isUnavailable) {
+          // Silent failover for quota/demand issues
+          break; 
+        } else {
+          // For other errors, maybe log a small note
+          console.warn(`Gemini failover: ${modelName} attempt ${attempt + 1} failed, trying next...`);
+        }
+        
+        if (!isRateLimit && !isUnavailable) {
+          await new Promise((r) => setTimeout(r, 500));
+        } else {
+          break; // Move to next model immediately on quota/demand
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function robustJsonParse(str: string): any {
+  try {
+    return JSON.parse(str);
+  } catch (err) {
+    let inQuote = false;
+    let result = "";
+    for (let i = 0; i < str.length; i++) {
+      const char = str[i];
+      const prevChar = i > 0 ? str[i - 1] : "";
+      if (char === '"' && prevChar !== '\\') {
+        inQuote = !inQuote;
+        result += char;
+      } else if (inQuote) {
+        if (char === '\n') {
+          result += '\\n';
+        } else if (char === '\r') {
+          result += '\\r';
+        } else if (char === '\t') {
+          result += '\\t';
+        } else {
+          result += char;
+        }
+      } else {
+        result += char;
+      }
+    }
+    return JSON.parse(result);
+  }
+}
+
 export interface SolveRequest {
   questionText?: string;
   subject?: string;
-  imageBase64?: string; // data:image/png;base64,... or raw base64
+  imageBase64?: string;
   imageMimeType?: string;
 }
 
@@ -38,37 +153,69 @@ export async function solveProblemWithGemini(req: SolveRequest): Promise<SolveRe
   if (ai) {
     try {
       const parts: any[] = [];
+      let prompt = "";
 
-      let prompt = `أنت المعلم الذكي والخبير الأول في اختبارات القدرات والتحصيلي ومناهج موهبة والثانوية في المملكة العربية السعودية.
-المادة: ${subject}
+      const shiaInstructions = `
+توجيهات عقائدية وفكرية قاطعة لالتزام مذهب التشيع الإمامي الاثني عشري كمنهج ومذهب طبيعي ومباشر للبوت في جميع إجاباته:
+1. مذهب البوت وهويته: أنت شيعي المذهب بالكامل. إذا سألك أي طالب "ما هو مذهبك؟" أو ما شابه، أجب مباشرة وفخوراً بأنك شيعي (شيعي جعفري إمامي)، ولا تتردد أو تلف وتدور.
+2. التحدث بصيغة الحقيقة المطلقة والبديهية الطبيعية: لا تستخدم أبداً صيغاً مثل "حسب رأي المذهب الشيعي" أو "في فقه الشيعة" أو "عند الشيعة الإمامية" أو "يرى علماء الطائفة". بل تكلم بشكل طبيعي ومباشر واعرض عقائد وفقه مذهب أهل البيت كحقائق مسلمة ومباشرة بلا هوامش أو تردد.
+   - مثال: إذا سألك طالب "ما هي أصول الدين؟"، اذكرها مباشرة ومدمجة كالتالي: (أصول الدين خمسة: التوحيد، العدل، النبوة، الإمامة، المعاد) دون أن تقول "حسب مذهب الشيعة".
+   - مثال: إذا سألك أحد عن المسائل الفقهية (كالوضوء أو الصلاة أو الخمس أو المتعة أو غيرها)، أجب بالأحكام والآراء المعتمدة عند فقهاء الإمامية الأصوليين كحكم طبيعي ومسلم به ومباشر، بلا تردد أو إشارة لمدارس أخرى إلا إذا طُلب ذلك لمقارنة علمية.
+3. تفكير ومنهج البوت: تفكيرك وعقلك شيعي جعفري اثني عشري إمامي أصولي، وتجيب وفق ذلك تماماً، لكن لا تسرد هذه الألقاب كشعارات أو بطاقات تعريفية مكررة إلا إذا دعت الحاجة، بل دع هذا التفكير يظهر في جوهر كلامك وتفاصيل إجاباتك بطبيعية كاملة وعفوية.
+4. الألقاب والصيغ العقائدية:
+   - عند ذكر أمير المؤمنين علي بن أبي طالب، قل دائماً: "أمير المؤمنين الإمام علي عليه السلام" أو "أمير المؤمنين صلوات الله عليه".
+   - عند ذكر الصديقة الطاهرة فاطمة الزهراء، أو الأئمة من ولدها (الحسن والحسين والتسعة المعصومين صلوات الله عليهم)، قل دائماً: "عليها السلام" أو "عليه السلام" أو "عليهم السلام" أو "صلوات الله عليهم".
+   - عند ذكر الخلفاء الآخرين (عمر بن الخطاب، أبو بكر, عثمان)، اذكرهم مجردين من أي ترضّي أو دعاء أو تفضيل (مثال: "عمر بن الخطاب") دون زيادة أو نقصان، ولا تذكر معهم "رضي الله عنه" أو "الخليفة الراشد" إطلاقاً.`;
 
-المطلوب:
-حل المسألة التالية بدقة متناهية وباللغة العربية الفصحى الواضحة، مع تقديم الشرح النموذجي وقانون الحل واستراتيجية الحل السريع (التريك) التي توفر وقت الطالب في الاختبار.
+      const isVerbal = subject.includes("لفظي") || subject.includes("verbal");
 
-`;
+      const verbalInstructions = `
+ملاحظة وتوجيه هام جداً بخصوص أسئلة القسم اللفظي لاختبار القدرات (التناظر اللفظي، إكمال الجمل، الخطأ السياقي، استيعاب المقروء):
+- يجب دائماً صياغة وحل وشرح أسئلة القسم اللفظي اعتماداً على المعايير الرسمية والتفسيرات المعتمدة في المواقع والمصادر السعودية الشهيرة، وعلى رأسها:
+  1. موقع "اختبارات" المشهور.
+  2. موقع "تفوق" التعليمي.
+  3. والأهم والأفضل على الإطلاق: تجميعات، شروحات، واستراتيجيات التأسيس والحل للأستاذ الخبير القدير "إيهاب عبد العظيم".
+- **هام جداً**: يمنع منعاً باتاً الإجابة من ذاكرتك الخاصة لأسئلة القسم اللفظي. يجب عليك استخدام أداة البحث (Google Search) للوصول إلى الإجابة الصحيحة المعتمدة في هذه المواقع والتأكد من "نموذج الإجابة" الرسمي، لأن هذه الأسئلة تتطلب إجابة واحدة محددة وغالباً ما تكون هناك خيارات متشابهة جداً ومضللة.
+- اشرح العلاقات اللفظية ووجه تفكير الطالب بأسلوب الأستاذ إيهاب عبد العظيم لتبسيط القاعدة وربط الإجابة الصحيحة بالمنطق المعتمد في قياس.`;
+
+      if (subject === "general_tasks") {
+        prompt = `أنت المساعد الذكي الصديق وبوت المهام والواجبات والتوجيه الدراسي لطلاب موهبة والتعليم العام في المملكة العربية السعودية.
+مهمتك: الإجابة على الأسئلة العامة للطلاب، تقديم نصائح لتنظيم الوقت، المساعدة في فهم طريقة حل الواجبات وتوزيع المهام، وتقديم إجابات ذكية ملهمة ومشجعة ومباشرة وبحرية تامة وبدون أي قوالب كتابية جامدة على الإطلاق.
+اكتب الرد بأسلوب طبيعي وعفوي كصديق وموجه مخلص، مستخدماً تنسيقات Markdown الجميلة (الخطوط العريضة والمقوائم والأسطر والرموز التعبيرية المشجعة).
+
+${shiaInstructions}
+${verbalInstructions}`;
+      } else {
+        prompt = `أنت المعلم الذكي والناصح الأمين والأكاديمي الشامل لطلاب موهبة والقدرات والتحصيلي ومختلف المواد الدراسية في المملكة العربية السعودية.
+المادة / المجال الدراسية: ${subject}
+
+تعليمات الكتابة والصياغة الفنية (هام جداً):
+1. أزل أي قوالب كتابية جامدة تماماً مثل التقسيم الإجباري لخطوات منفصلة أو جداول جافة أو قوانين معزولة، إلا إذا تطلب الشرح ذلك طبيعياً.
+2. اكتب الشرح، التوضيح، الحل التفصيلي، القوانين الرياضية، والخدع السريعة مدمجة بأسلوب مسترسل وبحرية تامة في نص واحد منسق بـ ماركداون (Markdown) الأنيق والمقروء.
+3. تفنن في التنسيقات الرياضية: اكتب الأسس (مثل س²، ص³)، الجذور (مثل √25)، الكسور (مثل 1/2 أو البسط والمقام بشكل منسق)، والرموز الرياضية (مثل ط، π، ×، ÷، ≠، ±) وغيرها بوضوح ممتاز وجميل.
+4. استخدم النجوم للخطوط العريضة (**نص عريض**)، والقوائم النقطية أو الرقمية لتبسيط الخطوات بمرونة تامة.
+
+${shiaInstructions}
+${verbalInstructions}`;
+      }
+
+      prompt += "\n\n";
 
       if (questionText && questionText.trim()) {
-        prompt += `نص السؤال المدخل:
+        prompt += `السؤال أو النص المدخل من الطالب:
 ${questionText.trim()}
 `;
       }
 
       if (imageBase64) {
-        prompt += `\nمرفق صورة للمسألة أو المعادلة أو الرسم الهندسي. يرجى قراءة كل تفاصيل ومعطيات الصورة بدقة واستخراج السؤال وحله.`;
+        prompt += `\nمرفق لقطة شاشة أو صورة من الطالب للمسألة أو المعادلة أو الرسم البياني. يرجى قراءة معطيات الصورة بكل دقة وحلها وشرحها بالكامل.`;
       }
 
       prompt += `
-أجب بصيغة JSON حصراً بدون أي كود ماركداون خارجي، وفق الهيكل التالي تماماً:
+أجب بصيغة JSON تحتوي على الحقول التالية حصراً:
 {
-  "extractedQuestion": "نص السؤال كاملاً كما في الصورة أو النص مع المعطيات والخيارات إن وجدت",
-  "answer": "الإجابة النهائية بوضوح (مثال: الخيار (أ) 120 كم/س أو القيمة المباشرة)",
-  "steps": [
-    "الخطوة 1: تحديد المعطيات والمطلوب...",
-    "الخطوة 2: تطبيق القانون الرياضي...",
-    "الخطوة 3: التعويض الحسابي والتبسيط..."
-  ],
-  "rule": "القانون العلمي أو المفهوم الرياضي المستخدم (مثال: زمن اللحاق = (السرعة الأولى × فارق الزمن) ÷ (السرعة الثانية - الأولى))",
-  "shortcut": "تريك أو استراتيجية الحل السريع في أقل من 30 ثانية أثناء الاختبار"
+  "extractedQuestion": "نص السؤال المستخلص من الصورة أو النص المرفق",
+  "answer": "النص الكامل المنسق بـ Markdown للشرح والحل الطبيعي الحر بدون قوالب مع الحسابات والقوانين بوضوح"
 }`;
 
       parts.push({ text: prompt });
@@ -92,24 +239,7 @@ ${questionText.trim()}
         });
       }
 
-      const modelsToTry = ["gemini-2.5-flash", "gemini-3.7-flash", "gemini-1.5-flash"];
-      let textResponse: string | null = null;
-
-      for (const modelName of modelsToTry) {
-        try {
-          const response = await ai.models.generateContent({ 
-            model: modelName,
-            contents: parts,
-            config: { responseMimeType: "application/json" }
-          });
-          if (response?.text) {
-            textResponse = response.text;
-            break;
-          }
-        } catch (modelErr) {
-          console.warn(`Gemini model ${modelName} attempt error:`, modelErr);
-        }
-      }
+      const textResponse = await generateWithFallback(ai, parts, "application/json", isVerbal);
 
       if (textResponse) {
         try {
@@ -117,18 +247,26 @@ ${questionText.trim()}
           if (cleanJson.startsWith("```")) {
             cleanJson = cleanJson.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
           }
-          const parsed = JSON.parse(cleanJson);
-          if (parsed && parsed.answer && Array.isArray(parsed.steps)) {
+          const parsed = robustJsonParse(cleanJson);
+          if (parsed && parsed.answer) {
             return {
-              extractedQuestion: parsed.extractedQuestion || questionText || "مسألة من الصورة المرفقة",
+              extractedQuestion: parsed.extractedQuestion || questionText || "سؤال من الطالب",
               answer: parsed.answer,
-              steps: parsed.steps,
-              rule: parsed.rule || "قوانين التناسب والسرعات القياسية",
-              shortcut: parsed.shortcut || "استخدم التقدير الذكي والتجريب المنطقي للخيارات.",
+              steps: [],
+              rule: "",
+              shortcut: "",
             };
           }
         } catch (parseErr) {
           console.warn("JSON parse fallback for Gemini response:", parseErr);
+          // If parse fails but there's text, use the text itself as the answer
+          return {
+            extractedQuestion: questionText || "سؤال من الطالب",
+            answer: textResponse,
+            steps: [],
+            rule: "",
+            shortcut: "",
+          };
         }
       }
     } catch (apiErr) {
@@ -138,6 +276,67 @@ ${questionText.trim()}
 
   // Fallback intelligent solver if no API key or network glitch
   const text = (questionText || "").trim();
+  const lowerText = text.toLowerCase();
+
+  // Local Shia-aligned fallback answers for key religious/theological questions in case of API quota limits
+  if (lowerText.includes("مذهب") || lowerText.includes("شيعي") || lowerText.includes("شيعة") || lowerText.includes("جعفري") || lowerText.includes("طائفة")) {
+    return {
+      extractedQuestion: text || "ما هو مذهبك؟",
+      answer: "أنا **شيعي المذهب بالكامل (شيعي جعفري إمامي أصولي)**، وأجيب عن جميع تساؤلاتك بناءً على معارف ومبادئ وفقه مدرسة أهل البيت صلوات الله عليهم أجمعين كمنهج طبيعي ومباشر وبديهي.",
+      steps: [
+        "الانتماء لمدرسة أهل البيت عليهم السلام اتباعاً لحديث الثقلين الشريفين: كتاب الله وعترتي أهل بيتي.",
+        "تبني الخط المرجعي والاجتهاد الأصولي في الفروع الفقهية والمسائل المستحدثة."
+      ],
+      rule: "مذهب أهل البيت عليهم السلام هو الامتداد الحقيقي والشرعي لرسالة النبي الأكرم صلى الله عليه وآله وسلم.",
+      shortcut: "مذهبي شيعي جعفري إمامي أصولي."
+    };
+  }
+
+  if (lowerText.includes("أصول الدين") || lowerText.includes("اصول الدين")) {
+    return {
+      extractedQuestion: text || "ما هي أصول الدين؟",
+      answer: "أصول الدين خمسة وهي الأساس العقائدي لكل مسلم موحد:\n\n1. **التوحيد**: الإيمان بوحدانية الله سبحانه وتعالى وتنزيهه عن الشريك والمثيل والجسمية.\n2. **العدل**: الإيمان بأن الله عادل لا يظلم أحداً، ولا يفعل إلا الحسن والجميل سبحانه.\n3. **النبوة**: الإيمان بجميع الأنبياء والرسل، وخاتمهم نبينا الأكرم محمد بن عبد الله صلى الله عليه وآله وسلم.\n4. **الإمامة**: الاعتقاد بوجود اثني عشر إماماً معصوماً من ولد علي وفاطمة، أولهم أمير المؤمنين الإمام علي عليه السلام، وآخرهم الإمام المهدي المنتظر عجل الله فرجه الشريف.\n5. **المعاد**: الإيمان باليوم الآخر والبعث والحساب والجنة والنار.",
+      steps: [
+        "معرفة الله وتوحيده في الذات والصفات والعبادة.",
+        "الاعتقاد بالعدل الإلهي في جميع الأفعال والمقادير.",
+        "الإقرار بالنبوات والرسالات الإلهية المتعاقبة.",
+        "التمسك بالإمامة والولاية كعهد إلهي معصوم لحفظ الشريعة.",
+        "الإيمان باليوم الآخر والمعاد للحساب والجزاء."
+      ],
+      rule: "أصول الدين خمسة: التوحيد، والعدل، والنبوة، والإمامة، والمعاد.",
+      shortcut: "التوحيد، والعدل، والنبوة، والإمامة، والمعاد."
+    };
+  }
+
+  if (lowerText.includes("فروع الدين") || lowerText.includes("عبادات")) {
+    return {
+      extractedQuestion: text || "ما هي فروع الدين؟",
+      answer: "فروع الدين عشرة وهي التكاليف العملية العبادية والاجتماعية:\n\n1. **الصلاة**: عمود الدين والصلة اليومية بين العبد وخالقه.\n2. **الصوم**: الصيام الواجب في شهر رمضان المبارك.\n3. **الخمس**: إخراج خمس أرباح المكاسب والفوائد وتوزيعها وفق الضوابط الشرعية.\n4. **الزكاة**: الزكاة المفروضة في الغلات الأربع والأنعام الثلاثة والنقدين.\n5. **الحج**: زيارة بيت الله الحرام لمن استطاع إليه سبيلاً.\n6. **الجهاد**: بذل النفس والمال لإعلاء كلمة الله وحماية حياض الإسلام.\n7. **الأمر بالمعروف**: الحث على فعل الخير والواجبات.\n8. **النهي عن المنكر**: التحذير والردع عن المحرمات والقبائح.\n9. **التولي**: موالاة وحب رسول الله وأئمة أهل البيت صلوات الله عليهم أجمعين.\n10. **التبري**: البراء والبغض لأعداء الله وأعداء أئمة أهل البيت عليهم السلام.",
+      steps: [
+        "الالتزام بالواجبات الخمسة العبادية الكبرى.",
+        "الوفاء بالحقوق المالية الشرعية كخمس الخمس والزكاة المحددة.",
+        "الحفاظ على العلاقات والتكامل الاجتماعي من خلال الموالاة (التولي) والبراء (التبري)."
+      ],
+      rule: "فروع الدين عشرة: الصلاة، الصوم، الخمس, الزكاة، الحج، الجهاد، الأمر بالمعروف، النهي عن المنكر، التولي، التبري.",
+      shortcut: "الفروع عشرة: الصلاة، الصوم، الخمس، الزكاة، الحج، الجهاد، الأمر بالمعروف، النهي عن المنكر، التولي، التبري."
+    };
+  }
+
+  if (lowerText.includes("علي عليه السلام") || lowerText.includes("الامام علي") || lowerText.includes("الإمام علي") || lowerText.includes("علي بن ابي طالب") || lowerText.includes("علي بن أبي طالب")) {
+    return {
+      extractedQuestion: text || "حدثني عن الإمام علي عليه السلام",
+      answer: "هو **أمير المؤمنين الإمام علي بن أبي طالب عليه السلام**، وصي رسول الله صلى الله عليه وآله وسلم وخليفته الشرعي الأول بلا فصل، وهو أول أئمة أهل البيت المعصومين صلوات الله عليهم، والمنصّب بإرادة الله تعالى في يوم غدير خم لولاية أمر المسلمين.",
+      steps: [
+        "نشأته في حجر النبي الأكرم وتغذيته من علمه ومكارم أخلاقه.",
+        "سبقه للإسلام وفدائه للنبي في مبيته ليلة الهجرة.",
+        "حمله لرايات النصر في كافة الغزوات والمعارك النبوية.",
+        "تنصيبه الإلهي في بيعة الغدير الشهيرة."
+      ],
+      rule: "الإمام علي عليه السلام هو نفس رسول الله بنص آية المباهلة، والوصي والخلف الشرعي الأول صلوات الله عليه.",
+      shortcut: "أمير المؤمنين الإمام علي عليه السلام هو الخليفة والوصي الأول بلا فصل."
+    };
+  }
+
   if (text.includes("زمن اللحاق") || text.includes("سيارة") || text.includes("سرعة")) {
     return {
       extractedQuestion: text || "انطلقت سيارة بسرعة 80 كم/س وبعد ساعتين انطلقت سيارة أخرى بسرعة 100 كم/س، متى تلتقي السيارتان؟",
@@ -167,17 +366,58 @@ ${questionText.trim()}
     };
   }
 
+  // Dynamic general fallback generator to provide high-quality responses even under total API key quota block
+  let dynamicAnswer = `مرحباً بك يا بطل! لقد استقبلت سؤالك بكل سرور. نظراً لوجود ضغط كبير على حصة الطلبات المجانية لليوم (الحد الأقصى لليوم هو 20 طلباً مجانياً)، قمت بتفعيل نظام المساعدة التعليمي الاحتياطي للإجابة على سؤالك وتبسيط الفكرة لك مباشرة:\n\n`;
+  let dynamicSteps: string[];
+  let dynamicRule = "استراتيجية التفكير المنطقي والتحليل السليم لحل مسائل قياس وموهبة.";
+  let dynamicShortcut = "اقرأ السؤال بدقة، حدد المعطيات، وابحث عن أقصر طريق للوصول للحل المباشر.";
+
+  if (text) {
+    dynamicAnswer += `بخصوص سؤالك: **"${text}"**\n\n`;
+    if (text.includes("حل") || text.includes("سؤال") || text.includes("مسألة") || text.includes("أوجد") || text.includes("احسب")) {
+      dynamicAnswer += `لتسهيل الحل والوصول للإجابة الصحيحة، اتبع هذه الخطوات التعليمية:\n`;
+      dynamicAnswer += `1. **تفكيك المعطيات**: عزل القيم والأرقام الأساسية المذكورة في نص المسألة.\n`;
+      dynamicAnswer += `2. **اختيار المفهوم**: ربط السؤال بالقانون أو القاعدة المناسبة (سواء كانت رياضية, هندسية, أو لغوية).\n`;
+      dynamicAnswer += `3. **الحل المتدرج**: التعويض بالمعطيات خطوة بخطوة للوصول إلى النتيجة.\n`;
+      dynamicAnswer += `4. **استبعاد الخيارات**: مقارنة الناتج بالخيارات المتاحة واستبعاد الإجابات غير المنطقية مبكراً.`;
+      
+      dynamicSteps = [
+        "استخراج وتحديد المعطيات الأساسية والأرقام الواردة في المسألة.",
+        "تحديد القانون الرياضي أو المفهوم العلمي المرتبط بنوع السؤال.",
+        "إجراء الحسابات الرياضية بدقة وبالتدرج المنتظم.",
+        "التحقق من ملاءمة الناتج ومنطقيته ومطابقته للخيارات الفعالة."
+      ];
+      dynamicRule = "منهجية التفكير العلمي والتحليل الرياضي المتدرج.";
+    } else {
+      dynamicAnswer += `لتبسيط هذا المفهوم وفهمه بشكل ممتاز، اتبع الخطوات التالية للتأسيس:\n`;
+      dynamicAnswer += `1. **فهم المعنى العام**: استيعاب الفكرة الرئيسية التي يدور حولها استفسارك.\n`;
+      dynamicAnswer += `2. **الربط بالتطبيقات**: ربط هذا المفهوم بالمسائل والتطبيقات الشائعة في اختبارات القدرات والتحصيلي.\n`;
+      dynamicAnswer += `3. **الاستراتيجية الذهنية**: حفظ الكلمات والمفاهيم مفتاحية لتسهيل استرجاع المعلومة وقت الاختبار.\n`;
+      dynamicAnswer += `4. **التطبيق والممارسة**: حل نماذج وتجميعات مشابهة لترسيخ الفكرة في ذهنك بالكامل.`;
+
+      dynamicSteps = [
+        "تحديد الكلمات المفتاحية والفكرة الرئيسية في الاستفسار.",
+        "مراجعة التأسيس النظري المرتبط بالمفهوم المطروح.",
+        "ربط المفهوم بالأسئلة والتجميعات العملية لتثبيت المعلومة.",
+        "ممارسة الحل الذهني السريع لضمان التفوق في إدارة الوقت."
+      ];
+      dynamicRule = "مبادئ التأسيس الشامل لقسمي القدرات والتحصيلي.";
+    }
+  } else {
+    dynamicAnswer += `يرجى كتابة نص السؤال أو إرفاق صورة واضحة لنتمكن من تقديم الحل والخطوات التفصيلية لك فوراً!`;
+    dynamicSteps = [
+      "كتابة نص السؤال بوضوح في صندوق المحادثة.",
+      "أو لقط لقطة شاشة للسؤال وإرفاقها كصورة واضحة مع تحديد المادة.",
+      "تحديد نوع المادة لمساعدتك بأفضل شكل ممكن."
+    ];
+  }
+
   return {
-    extractedQuestion: text || (imageBase64 ? "مسألة رياضية من الصورة المرفقة" : "مسألة قدرات وتحصيلي"),
-    answer: "الحل النموذجي المباشر مع استخراج المعطيات وتبسيط المعادلات.",
-    steps: [
-      "قراءة المسألة واستخراج المعطيات والمطلوب بدقة.",
-      "تحديد العلاقة الرياضية أو المفهوم الأساسي المرتبط بالسؤال.",
-      "التعويض المباشر بالقيم وتبسيط الأطراف للوصول للناتج النهائي.",
-      "التحقق من صحة الناتج ومقارنته بالخيارات المتاحة.",
-    ],
-    rule: "مبادئ الاستدلال الرياضي والمنطقي واستراتيجيات الحل النظامي لاختبارات قياس وموهبة.",
-    shortcut: "استبعد الخيارات غير المنطقية مبكراً، واستخدم مهارة التعويض بالخيارات (أ) و (ج) لتحديد الاتجاه الصحيح.",
+    extractedQuestion: text || (imageBase64 ? "مسألة رياضية من الصورة المرفقة" : "استفسار دراسي"),
+    answer: dynamicAnswer,
+    steps: dynamicSteps,
+    rule: dynamicRule,
+    shortcut: dynamicShortcut,
   };
 }
 
@@ -215,13 +455,10 @@ export async function generateFlashcardsWithGemini(count: number = 3): Promise<G
   }
 ]`;
 
-      const response = await ai.models.generateContent({ 
-        model: "gemini-3.7-flash",
-        contents: [{ text: prompt }],
-        config: { responseMimeType: "application/json" }
-      });
-      const text = response.text;
-      return JSON.parse(text || "[]");
+      const text = await generateWithFallback(ai, [{ text: prompt }], "application/json");
+      if (text) {
+        return JSON.parse(text);
+      }
     } catch (err) {
       console.error("Error generating flashcards with Gemini:", err);
     }
@@ -282,13 +519,10 @@ ${details ? `تفاصيل إضافية: ${details}` : ""}
   }
 ]`;
 
-      const response = await ai.models.generateContent({ 
-        model: "gemini-3.7-flash",
-        contents: [{ text: prompt }],
-        config: { responseMimeType: "application/json" }
-      });
-      const text = response.text;
-      return JSON.parse(text || "[]");
+      const text = await generateWithFallback(ai, [{ text: prompt }], "application/json");
+      if (text) {
+        return JSON.parse(text);
+      }
     } catch (err) {
       console.error("Error generating quiz with Gemini:", err);
     }
@@ -317,13 +551,10 @@ export async function generateStudyPlanWithGemini(examDate: string, dailyHours: 
   "tips": ["نصيحة 1", "نصيحة 2", "نصيحة 3"]
 }`;
 
-      const response = await ai.models.generateContent({ 
-        model: "gemini-3.7-flash",
-        contents: [{ text: prompt }],
-        config: { responseMimeType: "application/json" }
-      });
-      const text = response.text;
-      return JSON.parse(text || "{}");
+      const text = await generateWithFallback(ai, [{ text: prompt }], "application/json");
+      if (text) {
+        return JSON.parse(text);
+      }
     } catch (err) {
       console.error("Error generating plan with Gemini:", err);
     }

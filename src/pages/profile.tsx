@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Camera, Check, AlertCircle, User, KeyRound, LogOut, BarChart3, Trophy, Target, Star } from "lucide-react";
+import { Loader2, Camera, Check, AlertCircle, User, KeyRound, LogOut, BarChart3, Trophy, Target, Star, Plus, Trash2, Pin } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useCompletions } from "@/hooks/use-completions";
 import { isPast, parseISO, isToday } from "date-fns";
@@ -27,6 +27,43 @@ export default function ProfilePage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const [personalCards, setPersonalCards] = useState<Array<{ id: string; title: string; desc: string; color?: string }>>(() => {
+    try {
+      const stored = localStorage.getItem("student_personal_dashboard_cards");
+      return stored ? JSON.parse(stored) : [
+        { id: "1", title: "🎯 هدفي في القدرات والتحصيلي", desc: "الحصول على درجة 98+ بإذن الله والتدرب اليومي على التجميعات في المنصة.", color: "border-indigo-500 bg-indigo-500/5" },
+        { id: "2", title: "💡 قانون مساحة الدائرة مهم", desc: "مساحة الدائرة = ط × نق²", color: "border-emerald-500 bg-emerald-500/5" }
+      ];
+    } catch {
+      return [];
+    }
+  });
+
+  const [newCardTitle, setNewCardTitle] = useState("");
+  const [newCardDesc, setNewCardDesc] = useState("");
+  const [newCardColor, setNewCardColor] = useState("border-indigo-500 bg-indigo-500/5");
+
+  const handleAddCard = () => {
+    if (!newCardTitle.trim() || !newCardDesc.trim()) return;
+    const newCard = {
+      id: Date.now().toString(),
+      title: newCardTitle.trim(),
+      desc: newCardDesc.trim(),
+      color: newCardColor
+    };
+    const updated = [newCard, ...personalCards];
+    setPersonalCards(updated);
+    localStorage.setItem("student_personal_dashboard_cards", JSON.stringify(updated));
+    setNewCardTitle("");
+    setNewCardDesc("");
+  };
+
+  const handleDeleteCard = (id: string) => {
+    const updated = personalCards.filter(c => c.id !== id);
+    setPersonalCards(updated);
+    localStorage.setItem("student_personal_dashboard_cards", JSON.stringify(updated));
+  };
 
   const stats = useMemo(() => {
     const total = assignments.length;
@@ -306,6 +343,110 @@ export default function ProfilePage() {
             })}
           </div>
         )}
+      </div>
+
+      {/* Personal custom cards builder */}
+      <div className="glass rounded-2xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+            <h2 className="font-bold text-sm">مساحتي الشخصية والبطاقات المفضلة 🎯</h2>
+          </div>
+          <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">تخصيص كامل</span>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          أضف بطاقات مخصصة لمتابعة أهدافك، قوانينك الرياضية المفضلة، أو كبسولات المذاكرة الخاصة بك.
+        </p>
+
+        {/* List of cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+          {personalCards.map((card) => (
+            <motion.div
+              key={card.id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={`relative border-r-4 p-4 rounded-xl border border-border/60 ${card.color || "border-indigo-500 bg-indigo-500/5"} flex flex-col justify-between group shadow-sm`}
+            >
+              <button
+                onClick={() => handleDeleteCard(card.id)}
+                className="absolute top-2.5 left-2.5 h-6 w-6 rounded-lg bg-background/80 hover:bg-destructive/10 hover:text-destructive flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                title="حذف البطاقة"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+
+              <div>
+                <h3 className="font-bold text-xs text-foreground mb-1 pr-1 flex items-center gap-1">
+                  <Pin className="h-3 w-3 text-muted-foreground rotate-45 shrink-0" />
+                  {card.title}
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{card.desc}</p>
+              </div>
+            </motion.div>
+          ))}
+
+          {personalCards.length === 0 && (
+            <div className="col-span-full text-center py-6 text-muted-foreground text-xs">
+              لا توجد بطاقات مخصصة بعد. أنشئ بطاقتك الأولى بالأسفل! 👇
+            </div>
+          )}
+        </div>
+
+        {/* Add Card Form */}
+        <div className="border-t border-border/40 pt-4 space-y-3">
+          <p className="text-xs font-bold text-foreground">إضافة بطاقة جديدة:</p>
+          <div className="space-y-2">
+            <Input
+              placeholder="عنوان البطاقة (مثال: قانون النسبة)"
+              value={newCardTitle}
+              onChange={(e) => setNewCardTitle(e.target.value)}
+              className="rounded-xl h-9 text-xs"
+            />
+            <textarea
+              placeholder="وصف البطاقة أو المحتوى العلمي..."
+              value={newCardDesc}
+              onChange={(e) => setNewCardDesc(e.target.value)}
+              className="w-full min-h-[70px] bg-background border border-input rounded-xl p-2.5 text-xs outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/50 placeholder:text-muted-foreground/60"
+              dir="rtl"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground">اللون:</span>
+              {[
+                { class: "border-indigo-500 bg-indigo-500/5", label: "نيلي" },
+                { class: "border-emerald-500 bg-emerald-500/5", label: "زمردي" },
+                { class: "border-fuchsia-500 bg-fuchsia-500/5", label: "فوشيا" },
+                { class: "border-amber-500 bg-amber-500/5", label: "كهرماني" },
+              ].map((colorObj) => (
+                <button
+                  key={colorObj.class}
+                  type="button"
+                  onClick={() => setNewCardColor(colorObj.class)}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                    newCardColor === colorObj.class
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border hover:bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {colorObj.label}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              type="button"
+              onClick={handleAddCard}
+              disabled={!newCardTitle.trim() || !newCardDesc.trim()}
+              className="h-8 rounded-lg text-xs gap-1 px-3"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>إضافة مساحتي</span>
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Alerts */}

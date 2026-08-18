@@ -18,6 +18,7 @@ import { LibraryTab } from "@/components/admin/library-tab";
 import { ChannelsTab } from "@/components/admin/channels-tab";
 import { FlashcardsTab } from "@/components/admin/flashcards-tab";
 import { PollsTab } from "@/components/admin/polls-tab";
+import { EscalationsTab } from "@/components/admin/escalations-tab";
 import { motion } from "framer-motion";
 import { useGetDashboardStats, useListStudents, useListQuizzes, exportAllAppData, pushAllLocalDataToCloud } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -224,6 +225,10 @@ export default function AdminDashboard() {
               <Users className="h-3.5 w-3.5 text-purple-500" />
               استطلاعات الرأي والتصويت
             </TabsTrigger>
+            <TabsTrigger value="escalations" className={triggerClass}>
+              <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+              اعتراضات وتصحيح الـ AI
+            </TabsTrigger>
             <TabsTrigger value="events" className={triggerClass}>
               <CalendarDays className="h-3.5 w-3.5" />
               الإجازات
@@ -271,6 +276,9 @@ export default function AdminDashboard() {
         </TabsContent>
         <TabsContent value="polls" className="m-0">
           <PollsTab />
+        </TabsContent>
+        <TabsContent value="escalations" className="m-0">
+          <EscalationsTab />
         </TabsContent>
         <TabsContent value="events" className="m-0">
           <EventsTab />

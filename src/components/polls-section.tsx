@@ -811,14 +811,14 @@ export function PollsSection({ className = "", limit, showAllLink = false }: Pol
                         return (
                           <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                             <div className="flex items-center justify-between">
-                              <p className="text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
+                              <div className="text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
                                 <span>مشاركات الطلاب الآخرين ({peerVotes.length}):</span>
                                 {isHiddenByAdmin && isAdmin && (
                                   <Badge variant="outline" className="text-[9px] text-purple-600 border-purple-300 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0">
                                     مخفية عن الطلاب (للمشرف فقط)
                                   </Badge>
                                 )}
-                              </p>
+                              </div>
                               {isAdmin && (
                                 <Button
                                   variant="ghost"
