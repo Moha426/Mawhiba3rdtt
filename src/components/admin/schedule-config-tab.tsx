@@ -52,13 +52,16 @@ export function ScheduleConfigTab() {
 
   useEffect(() => {
     if (config) {
-      setForm({
-        periodsCount: config.periodsCount,
-        breakAfterPeriod: config.breakAfterPeriod,
-        periodDuration: config.periodDuration,
-        breakDuration: config.breakDuration,
-        startTime: config.startTime,
-      });
+      const nextForm = {
+        periodsCount: config.periodsCount ?? 7,
+        breakAfterPeriod: config.breakAfterPeriod ?? 3,
+        periodDuration: config.periodDuration ?? 45,
+        breakDuration: config.breakDuration ?? 20,
+        startTime: config.startTime ?? "07:30",
+      };
+      if (JSON.stringify(nextForm) !== JSON.stringify(form)) {
+        setForm(nextForm);
+      }
     }
   }, [config]);
 

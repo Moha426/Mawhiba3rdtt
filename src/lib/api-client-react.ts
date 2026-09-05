@@ -34,10 +34,22 @@ export function usePersistentState<T>(key: string, initialValue: T): [T, (val: T
   const [state, setState] = useState<T>(() => {
     try {
       const item = localStorage.getItem(`app_data_${key}`);
-      if (item) return JSON.parse(item);
+      if (item) {
+        const parsed = JSON.parse(item);
+        if (key === "flashcards" && Array.isArray(parsed) && parsed.length === 0 && Array.isArray(initialValue) && initialValue.length > 0) {
+          return initialValue;
+        }
+        return parsed;
+      }
       if (key === "flashcards") {
         const fcItem = localStorage.getItem("talented_english_flashcards_v1");
-        if (fcItem) return JSON.parse(fcItem);
+        if (fcItem) {
+          const parsed = JSON.parse(fcItem);
+          if (Array.isArray(parsed) && parsed.length === 0 && Array.isArray(initialValue) && initialValue.length > 0) {
+            return initialValue;
+          }
+          return parsed;
+        }
       }
       if (key === "platforms") {
         const platItem = localStorage.getItem("talented_school_custom_platforms_v1");
@@ -66,7 +78,35 @@ export function usePersistentState<T>(key: string, initialValue: T): [T, (val: T
           if (snapshot.exists()) {
             const data = snapshot.data();
             if (data && data.value !== undefined && data.value !== null) {
-              const val = data.value;
+              let val = data.value;
+
+              // Automatic healing and curriculum sync for flashcards
+              if (key === "flashcards" && Array.isArray(initialValue)) {
+                if (Array.isArray(val) && val.length === 0) {
+                  val = initialValue;
+                  queueDebouncedFirestoreWrite(key, val);
+                } else if (Array.isArray(val)) {
+                  const existingIds = new Set(val.map((c: any) => c?.id));
+                  const existingWords = new Set(val.map((c: any) => c?.word?.trim()?.toLowerCase()));
+                  let hasNew = false;
+                  const merged = [...val];
+                  for (const card of (initialValue as any[])) {
+                    if (!card) continue;
+                    const normWord = card.word?.trim()?.toLowerCase();
+                    if (!existingIds.has(card.id) && !existingWords.has(normWord)) {
+                      merged.push(card);
+                      existingIds.add(card.id);
+                      if (normWord) existingWords.add(normWord);
+                      hasNew = true;
+                    }
+                  }
+                  if (hasNew) {
+                    val = merged;
+                    queueDebouncedFirestoreWrite(key, val);
+                  }
+                }
+              }
+
               setState(val);
               try {
                 localStorage.setItem(`app_data_${key}`, JSON.stringify(val));
@@ -332,11 +372,11 @@ export async function importAllAppData(bundle: Record<string, any>): Promise<{ s
 
 // Initial default seed data
 const defaultSubjects = [
-  { id: 1, name: "الرياضيات", color: "#3b82f6", teacherName: "أ. محمد علي", teacherPhone: "0501234567" },
-  { id: 2, name: "الفيزياء", color: "#8b5cf6", teacherName: "أ. أحمد محمود", teacherPhone: "0502345678" },
-  { id: 3, name: "الكيمياء", color: "#ec4899", teacherName: "د. خالد السعيد", teacherPhone: "0503456789" },
-  { id: 4, name: "اللغة العربية", color: "#f59e0b", teacherName: "أ. عمر الفاروق", teacherPhone: "0504567890" },
-  { id: 5, name: "اللغة الإنجليزية", color: "#10b981", teacherName: "Mr. Smith", teacherPhone: "0505678901" },
+  { id: 1, name: "الرياضيات", color: "#3b82f6", teacherName: "أ. محمد علي", teacherPhone: "0501234567", rooms: ["قاعة 101", "مختبر الرياضيات 1"] },
+  { id: 2, name: "الفيزياء", color: "#8b5cf6", teacherName: "أ. أحمد محمود", teacherPhone: "0502345678", rooms: ["معمل الفيزياء", "مختبر العلوم 2"] },
+  { id: 3, name: "الكيمياء", color: "#ec4899", teacherName: "د. خالد السعيد", teacherPhone: "0503456789", rooms: ["المختبر الكيميائي"] },
+  { id: 4, name: "اللغة العربية", color: "#f59e0b", teacherName: "أ. عمر الفاروق", teacherPhone: "0504567890", rooms: ["قاعة 102", "القاعة الكبرى"] },
+  { id: 5, name: "اللغة الإنجليزية", color: "#10b981", teacherName: "Mr. Smith", teacherPhone: "0505678901", rooms: ["معمل اللغات الصوتية"] },
 ];
 
 const defaultAssignments = [
@@ -869,10 +909,18 @@ export const useListSchedule = () => {
 
   const enriched = schedule.map((slot) => {
     const sub = subjects.find((s) => String(s.id) === String(slot.subjectId));
+    // Determine the room: if slot has a specific room selected, use it; otherwise if subject has 1 room, use it as default
+    const defaultRoom = sub?.rooms && sub.rooms.length === 1 ? sub.rooms[0] : (sub?.rooms?.[0] || "");
+    const room = slot.room || (sub?.rooms && sub.rooms.length === 1 ? sub.rooms[0] : slot.notes || defaultRoom || "");
+
     return {
       ...slot,
       subjectName: sub?.name || slot.subjectName || "مادة",
       subjectColor: sub?.color || slot.subjectColor || "#3b82f6",
+      teacherName: slot.teacherName || sub?.teacherName || "",
+      teacherPhone: slot.teacherPhone || sub?.teacherPhone || "",
+      room: room,
+      availableRooms: sub?.rooms || (room ? [room] : []),
     };
   });
 
@@ -922,6 +970,9 @@ export const useCreateScheduleSlot = () => {
     mutate: (payload: any, opts?: any) => {
       const data = payload?.data || payload;
       const sub = subjects.find((s) => String(s.id) === String(data.subjectId));
+      const defaultRoom = sub?.rooms && sub.rooms.length === 1 ? sub.rooms[0] : (sub?.rooms?.[0] || "");
+      const room = data.room || defaultRoom || data.notes || "";
+
       setSchedule((prev) => [
         ...prev,
         {
@@ -929,6 +980,9 @@ export const useCreateScheduleSlot = () => {
           id: data.id || Date.now(),
           subjectName: data.subjectName || sub?.name || "مادة",
           subjectColor: data.subjectColor || sub?.color || "#3b82f6",
+          teacherName: data.teacherName || sub?.teacherName || "",
+          teacherPhone: data.teacherPhone || sub?.teacherPhone || "",
+          room: room,
         }
       ]);
       opts?.onSuccess?.();
@@ -936,6 +990,9 @@ export const useCreateScheduleSlot = () => {
     mutateAsync: async (payload: any) => {
       const data = payload?.data || payload;
       const sub = subjects.find((s) => String(s.id) === String(data.subjectId));
+      const defaultRoom = sub?.rooms && sub.rooms.length === 1 ? sub.rooms[0] : (sub?.rooms?.[0] || "");
+      const room = data.room || defaultRoom || data.notes || "";
+
       setSchedule((prev) => [
         ...prev,
         {
@@ -943,6 +1000,9 @@ export const useCreateScheduleSlot = () => {
           id: data.id || Date.now(),
           subjectName: data.subjectName || sub?.name || "مادة",
           subjectColor: data.subjectColor || sub?.color || "#3b82f6",
+          teacherName: data.teacherName || sub?.teacherName || "",
+          teacherPhone: data.teacherPhone || sub?.teacherPhone || "",
+          room: room,
         }
       ]);
     },
@@ -958,14 +1018,20 @@ export const useUpdateScheduleSlot = () => {
       const id = payload?.id || payload;
       const data = payload?.data || payload;
       const sub = subjects.find((s) => String(s.id) === String(data.subjectId));
+      const defaultRoom = sub?.rooms && sub.rooms.length === 1 ? sub.rooms[0] : (sub?.rooms?.[0] || "");
+
       setSchedule((prev) =>
         prev.map((s) => {
           if (String(s.id) === String(id)) {
+            const room = data.room !== undefined ? data.room : (s.room || defaultRoom || data.notes || s.notes || "");
             return {
               ...s,
               ...data,
               subjectName: data.subjectName || sub?.name || s.subjectName || "مادة",
               subjectColor: data.subjectColor || sub?.color || s.subjectColor || "#3b82f6",
+              teacherName: data.teacherName || sub?.teacherName || s.teacherName || "",
+              teacherPhone: data.teacherPhone || sub?.teacherPhone || s.teacherPhone || "",
+              room: room,
             };
           }
           return s;
@@ -977,14 +1043,20 @@ export const useUpdateScheduleSlot = () => {
       const id = payload?.id || payload;
       const data = payload?.data || payload;
       const sub = subjects.find((s) => String(s.id) === String(data.subjectId));
+      const defaultRoom = sub?.rooms && sub.rooms.length === 1 ? sub.rooms[0] : (sub?.rooms?.[0] || "");
+
       setSchedule((prev) =>
         prev.map((s) => {
           if (String(s.id) === String(id)) {
+            const room = data.room !== undefined ? data.room : (s.room || defaultRoom || data.notes || s.notes || "");
             return {
               ...s,
               ...data,
               subjectName: data.subjectName || sub?.name || s.subjectName || "مادة",
               subjectColor: data.subjectColor || sub?.color || s.subjectColor || "#3b82f6",
+              teacherName: data.teacherName || sub?.teacherName || s.teacherName || "",
+              teacherPhone: data.teacherPhone || sub?.teacherPhone || s.teacherPhone || "",
+              room: room,
             };
           }
           return s;

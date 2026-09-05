@@ -89,13 +89,14 @@ const PLATFORM_ICONS: Record<string, LucideIcon> = {
 const navItems = [
   { href: "/", label: "الرئيسية", icon: LayoutDashboard },
   { href: "/ai-tutor", label: "المعلم الذكي", icon: Bot },
+  { href: "/teacher", label: "دليل المعلمين", icon: Users },
+  { href: "/schedule", label: "الجدول الدراسي", icon: GraduationCap },
+  { href: "/assignments", label: "المهام والواجبات", icon: BookOpen },
+  { href: "/quizzes", label: "الاختبارات والتحديات", icon: Trophy },
   { href: "/platforms", label: "المنصات والمذاكرة", icon: Globe },
   { href: "/library", label: "المكتبة والتجميعات", icon: FolderDown },
   { href: "/channels", label: "بوابة القنوات", icon: MessageSquare },
   { href: "/flashcards", label: "بطاقات الإنجليزية", icon: Languages },
-  { href: "/quizzes", label: "الاختبارات والتحديات", icon: Trophy },
-  { href: "/assignments", label: "المهام والواجبات", icon: BookOpen },
-  { href: "/schedule", label: "الجدول الدراسي", icon: GraduationCap },
   { href: "/timer", label: "مؤقت المذاكرة", icon: Timer },
   { href: "/calendar", label: "التقويم الزمني", icon: CalendarDays },
 ];

@@ -497,9 +497,12 @@ export function getStoredFlashcards(defaultList: any[] = []): any[] {
     const saved = savedAppData !== null ? savedAppData : savedLegacy;
     if (saved !== null && saved !== undefined) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
-        // Return parsed even if empty! (Fixes bug where deleting all cards re-adds defaults)
-        return parsed.filter((c: any) => c && c.id && !deletedIds.has(c.id));
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const storedClean = parsed.filter((c: any) => c && c.id && !deletedIds.has(c.id));
+        // Merge any new default cards that aren't deleted
+        const existingIds = new Set(storedClean.map((c: any) => c.id));
+        const missingDefaults = defaultList.filter((c: any) => c && c.id && !deletedIds.has(c.id) && !existingIds.has(c.id));
+        return [...storedClean, ...missingDefaults];
       }
     }
   } catch (e) {

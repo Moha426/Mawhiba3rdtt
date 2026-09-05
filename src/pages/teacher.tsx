@@ -52,7 +52,8 @@ export default function TeacherPage() {
   const { data: settingsData } = useGetSettings();
   const { data: subjects = [], isLoading: isSubjectsLoading } = useListSubjects();
 
-  const [activeTab, setActiveTab] = useState<"questions" | "suggestions" | "contact">("questions");
+  const [activeTab, setActiveTab] = useState<"directory" | "questions" | "suggestions" | "contact">("directory");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Questions State
   const [questions, setQuestions] = useState<StudentQuestion[]>([]);
@@ -113,8 +114,27 @@ export default function TeacherPage() {
   }, []);
 
   useEffect(() => {
-    loadQuestions();
-    loadSuggestions();
+    let isMounted = true;
+    const fetchAll = async () => {
+      try {
+        setIsQuestionsLoading(true);
+        setIsSuggestionsLoading(true);
+        const [qData, sData] = await Promise.all([fetchQuestionsApi(), fetchSuggestionsApi()]);
+        if (isMounted) {
+          setQuestions(qData);
+          setSuggestions(sData);
+        }
+      } catch (err) {
+        console.warn(err);
+      } finally {
+        if (isMounted) {
+          setIsQuestionsLoading(false);
+          setIsSuggestionsLoading(false);
+        }
+      }
+    };
+
+    fetchAll();
 
     const handleQChange = () => { loadQuestions(); };
     const handleSChange = () => { loadSuggestions(); };
@@ -123,6 +143,7 @@ export default function TeacherPage() {
     window.addEventListener("suggestions_data_change", handleSChange);
 
     return () => {
+      isMounted = false;
       window.removeEventListener("questions_data_change", handleQChange);
       window.removeEventListener("suggestions_data_change", handleSChange);
     };
@@ -227,6 +248,11 @@ export default function TeacherPage() {
     }
   };
 
+  const openAskForTeacher = (subjectName: string) => {
+    setQSubject(subjectName);
+    setIsAskOpen(true);
+  };
+
   const showSchool = settingsData?.showSchoolName !== false;
   const rawSchoolName = typeof settingsData?.schoolName === "string" ? settingsData.schoolName.trim() : null;
   const resolvedSchoolName = showSchool && rawSchoolName ? rawSchoolName : null;
@@ -237,7 +263,48 @@ export default function TeacherPage() {
     socialLinks: settingsData?.socialLinks ?? [],
   };
 
-  const subjectsWithTeacher = subjects.filter((s) => s.teacherName || s.teacherPhone);
+  // Group and format teachers from subjects list
+  const teachersGrouped = useMemo(() => {
+    const map = new Map<string, {
+      name: string;
+      phone: string | null;
+      subjects: Array<{ name: string; color: string; rooms: string[] }>;
+    }>();
+
+    subjects.forEach((sub) => {
+      const teacherName = sub.teacherName?.trim() || "معلم المادة";
+      const teacherPhone = (sub as any).teacherPhone?.trim() || null;
+      const subRooms = Array.isArray(sub.rooms) ? sub.rooms : (sub.room ? [sub.room] : []);
+
+      if (!map.has(teacherName)) {
+        map.set(teacherName, {
+          name: teacherName,
+          phone: teacherPhone,
+          subjects: [{ name: sub.name, color: sub.color || "#6366f1", rooms: subRooms }],
+        });
+      } else {
+        const item = map.get(teacherName)!;
+        if (!item.phone && teacherPhone) item.phone = teacherPhone;
+        item.subjects.push({ name: sub.name, color: sub.color || "#6366f1", rooms: subRooms });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [subjects]);
+
+  // Filtered teachers list based on search
+  const filteredTeachers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return teachersGrouped;
+    return teachersGrouped.filter((t) => {
+      return (
+        t.name.toLowerCase().includes(q) ||
+        (t.phone && t.phone.includes(q)) ||
+        t.subjects.some((s) => s.name.toLowerCase().includes(q) || s.rooms.some((r) => r.toLowerCase().includes(q)))
+      );
+    });
+  }, [teachersGrouped, searchQuery]);
+
   const socialLinks = (settings?.socialLinks ?? []).filter((l) => l.url);
 
   if (isSubjectsLoading) return <LoadingPage />;
@@ -245,19 +312,31 @@ export default function TeacherPage() {
   return (
     <motion.div
       className="space-y-6"
+      dir="rtl"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
       <PageHeader
         icon={Users}
-        title="المعلمون والاقتراحات والأسئلة"
-        subtitle="تواصل مع معلميك، أرسل أسئلتك المستعصية، وشارك مقترحاتك لتطوير المنصة"
+        title="دليل المعلمين والتواصل الأكاديمي"
+        subtitle="استعرض قائمة المعلمين وموادهم وقاعاتهم وأرقام التواصل المباشرة، مع إمكانية توجيه الأسئلة والمقترحات"
       />
 
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
         <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3 flex-wrap">
-          <TabsList className="h-11 rounded-2xl bg-muted/60 p-1">
+          <TabsList className="h-11 rounded-2xl bg-muted/60 p-1 flex-wrap">
+            <TabsTrigger
+              value="directory"
+              className="rounded-xl px-4 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all"
+            >
+              <Users className="h-4 w-4 text-primary" />
+              <span>دليل المعلمين والمواد</span>
+              <span className="bg-primary/15 text-primary text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                {teachersGrouped.length}
+              </span>
+            </TabsTrigger>
+
             <TabsTrigger
               value="questions"
               className="rounded-xl px-4 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all"
@@ -289,11 +368,21 @@ export default function TeacherPage() {
               className="rounded-xl px-4 text-xs sm:text-sm font-bold gap-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all"
             >
               <Phone className="h-4 w-4 text-emerald-500" />
-              <span>دليل المعلمين والتواصل</span>
+              <span>المدرسة والروابط</span>
             </TabsTrigger>
           </TabsList>
 
           <div className="flex items-center gap-2">
+            {activeTab === "directory" && (
+              <Button
+                onClick={() => setIsAskOpen(true)}
+                className="h-10 rounded-2xl px-4 font-bold text-xs gap-1.5 bg-primary text-primary-foreground shadow-sm"
+              >
+                <HelpCircle className="h-4 w-4" />
+                <span>طرح سؤال على معلم</span>
+              </Button>
+            )}
+
             {activeTab === "questions" && (
               <Button
                 onClick={() => setIsAskOpen(true)}
@@ -315,6 +404,161 @@ export default function TeacherPage() {
             )}
           </div>
         </div>
+
+        {/* ── TAB 0: TEACHERS DIRECTORY ── */}
+        <TabsContent value="directory" className="space-y-4 mt-5">
+          {/* Filter & Search Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-3xl bg-card border border-border/50 shadow-xs">
+            <div className="relative w-full sm:w-80">
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="ابحث عن اسم معلم، مادة، أو قاعة..."
+                className="rounded-2xl h-10 text-xs pr-4 pl-8"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+              <span>إجمالي المعلمين: <strong className="text-foreground">{teachersGrouped.length}</strong></span>
+              <span>·</span>
+              <span>المواد المسجلة: <strong className="text-foreground">{subjects.length}</strong></span>
+            </div>
+          </div>
+
+          {/* Teacher Cards Grid */}
+          {filteredTeachers.length === 0 ? (
+            <div className="rounded-3xl border border-border/60 bg-card p-12 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                <Users className="h-6 w-6" />
+              </div>
+              <h3 className="font-bold text-foreground text-base">لا توجد نتائج مطابقة</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                جرب البحث بكلمات أخرى أو تأكد من إضافة بيانات المعلمين في لوحة التحكم.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredTeachers.map((teacher, index) => {
+                const displayName = teacher.name.startsWith("أ.") || teacher.name.startsWith("د.") || teacher.name.startsWith("Mr.")
+                  ? teacher.name
+                  : `أ. ${teacher.name}`;
+
+                return (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.04 }}
+                    className="rounded-3xl border border-border/60 bg-card p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4 group"
+                  >
+                    <div className="space-y-3.5">
+                      {/* Teacher Header */}
+                      <div className="flex items-start gap-3">
+                        <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold text-lg shrink-0 border border-primary/20">
+                          {teacher.name.replace(/^(أ\.|د\.|Mr\.)\s*/, "").charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-extrabold text-base text-foreground truncate">{displayName}</h3>
+                          <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                            معلم {teacher.subjects.map(s => s.name).join(" و ")}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Subjects & Rooms List */}
+                      <div className="space-y-2 pt-1">
+                        <span className="text-[11px] font-bold text-muted-foreground block">المواد والقاعات المرتبطة:</span>
+                        <div className="space-y-1.5">
+                          {teacher.subjects.map((sub, sIdx) => (
+                            <div
+                              key={sIdx}
+                              className="p-2.5 rounded-2xl border flex flex-col gap-1.5 transition-colors"
+                              style={{
+                                backgroundColor: `${sub.color}0c`,
+                                borderColor: `${sub.color}25`,
+                              }}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: sub.color }} />
+                                  <span className="font-bold text-xs text-foreground">{sub.name}</span>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openAskForTeacher(sub.name)}
+                                  className="h-6 px-2 text-[10px] rounded-lg font-bold hover:bg-card"
+                                >
+                                  اسأل في المادة
+                                </Button>
+                              </div>
+
+                              {sub.rooms.length > 0 && (
+                                <div className="flex items-center gap-1 text-[11px] text-foreground/80 flex-wrap pt-0.5 border-t border-border/20">
+                                  <MapPin className="h-3 w-3 text-primary shrink-0" />
+                                  <span className="text-muted-foreground">القاعات:</span>
+                                  {sub.rooms.map((r, rIdx) => (
+                                    <span key={rIdx} className="px-1.5 py-0.2 rounded bg-card text-foreground font-semibold border border-border/40 text-[10px]">
+                                      {r}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions & Contact */}
+                    <div className="pt-3 border-t border-border/40 space-y-2">
+                      {teacher.phone ? (
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`https://wa.me/${teacher.phone}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold hover:bg-emerald-100 transition-colors shadow-2xs"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                            واتساب
+                          </a>
+                          <a
+                            href={`tel:${teacher.phone}`}
+                            className="inline-flex items-center justify-center py-2 px-3 rounded-2xl bg-muted text-muted-foreground hover:text-foreground border border-border/50 text-xs font-semibold hover:bg-muted/80 transition-colors"
+                          >
+                            <Phone className="h-3.5 w-3.5 ml-1" />
+                            اتصال
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between text-xs text-muted-foreground bg-muted/30 p-2 rounded-xl border border-border/30">
+                          <span className="text-[11px]">التواصل عبر المنصة</span>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            onClick={() => openAskForTeacher(teacher.subjects[0]?.name || "عام")}
+                            className="h-auto p-0 text-xs font-bold text-primary"
+                          >
+                            توجيه سؤال
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
 
         {/* ── TAB 1: QUESTIONS TO TEACHER ── */}
         <TabsContent value="questions" className="space-y-4 mt-5">

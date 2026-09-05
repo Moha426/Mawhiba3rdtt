@@ -19,6 +19,7 @@ import { getStoredFlashcards, saveStoredFlashcards, deleteStoredFlashcard } from
 import { usePersistentState } from "@/lib/api-client-react";
 
 const PRESET_CATEGORIES = [
+  "Unit 1: Two Is Better Than One",
   "أكاديمي وSTEP",
   "مفردات الموهبة",
   "مفردات العلوم",
@@ -57,15 +58,20 @@ export function FlashcardsTab() {
   const [formCategory, setFormCategory] = useState("أكاديمي وSTEP");
   const [formDifficulty, setFormDifficulty] = useState<"سهل" | "متوسط" | "متقدم">("متوسط");
 
+  // Clean cards list without legacy fc-1..fc-15 filler cards
+  const cleanCards = useMemo(() => {
+    return cards.filter(c => c && c.id && !/^fc-\d+$/.test(c.id));
+  }, [cards]);
+
   // Get categories list
   const availableCategories = useMemo(() => {
-    const cats = Array.from(new Set(cards.map(c => c.category)));
+    const cats = Array.from(new Set(cleanCards.map(c => c.category)));
     return Array.from(new Set([...PRESET_CATEGORIES, ...cats]));
-  }, [cards]);
+  }, [cleanCards]);
 
   // Filtered Cards
   const filteredCards = useMemo(() => {
-    return cards.filter(card => {
+    return cleanCards.filter(card => {
       if (selectedCategory !== "الكل" && card.category !== selectedCategory) return false;
       if (selectedDifficulty !== "الكل" && card.difficulty !== selectedDifficulty) return false;
       if (search.trim()) {

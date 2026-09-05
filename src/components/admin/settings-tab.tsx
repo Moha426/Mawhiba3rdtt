@@ -36,9 +36,18 @@ export function SettingsTab() {
 
   useEffect(() => {
     if (settingsData) {
-      setShowSchoolName(settingsData.showSchoolName !== false);
-      setSchoolName(settingsData.schoolName ?? "");
-      setSocialLinks(settingsData.socialLinks ?? []);
+      const nextShow = settingsData.showSchoolName !== false;
+      const nextName = settingsData.schoolName ?? "";
+      const nextLinks = settingsData.socialLinks ?? [];
+      if (
+        showSchoolName !== nextShow ||
+        schoolName !== nextName ||
+        JSON.stringify(socialLinks) !== JSON.stringify(nextLinks)
+      ) {
+        setShowSchoolName(nextShow);
+        setSchoolName(nextName);
+        setSocialLinks(nextLinks);
+      }
     }
   }, [settingsData]);
 

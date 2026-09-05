@@ -49,8 +49,10 @@ export default function FlashcardsPage() {
 
   // Combined cards list with strict deduplication
   const cards = useMemo(() => {
-    const list = Array.isArray(sharedCards) ? sharedCards : DEFAULT_FLASHCARDS;
-    const combined = [...personalCards, ...list];
+    const list = Array.isArray(sharedCards) && sharedCards.length > 0 ? sharedCards : DEFAULT_FLASHCARDS;
+    // Filter out old filler cards fc-1 to fc-15 if present in legacy storage
+    const cleanList = list.filter(c => c && c.id && !/^fc-\d+$/.test(c.id));
+    const combined = [...personalCards, ...cleanList, ...DEFAULT_FLASHCARDS];
     
     // Strict deduplication by unique ID and trimmed lowercase word
     const seenIds = new Set<string>();

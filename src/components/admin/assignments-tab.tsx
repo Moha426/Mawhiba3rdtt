@@ -170,9 +170,11 @@ function CategoryCombobox({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [inputVal, setInputVal] = useState(value);
+  const [inputVal, setInputVal] = useState(value || "");
 
-  useEffect(() => { setInputVal(value); }, [value]);
+  useEffect(() => {
+    setInputVal((prev) => (prev !== value ? (value || "") : prev));
+  }, [value]);
 
   const filtered = FILE_CATEGORIES.filter(
     (c) => !inputVal.trim() || c.includes(inputVal.trim())
@@ -281,7 +283,12 @@ export function AssignmentsTab() {
   const [localOrder, setLocalOrder] = useState<Assignment[]>([]);
 
   useEffect(() => {
-    if (rawAssignments) setLocalOrder(rawAssignments as Assignment[]);
+    if (rawAssignments) {
+      const newArr = rawAssignments as Assignment[];
+      if (JSON.stringify(newArr) !== JSON.stringify(localOrder)) {
+        setLocalOrder(newArr);
+      }
+    }
   }, [rawAssignments]);
 
   const sensors = useSensors(
@@ -339,18 +346,29 @@ export function AssignmentsTab() {
 
   const { data: events } = useListEvents({});
 
-  useEffect(() => {
-    if (isOpen && !editingId && !subjectId && subjects?.length) {
-      setSubjectId(subjects[0].id.toString());
-    }
-  }, [isOpen, subjects, editingId, subjectId]);
-
-  useEffect(() => {
-    if (isAutoPriority && isOpen) {
-      const subjectName = subjects?.find(s => s.id.toString() === subjectId)?.name;
+  const handleSubjectChange = (newSubjectId: string) => {
+    setSubjectId(newSubjectId);
+    if (isAutoPriority) {
+      const subjectName = subjects?.find(s => s.id.toString() === newSubjectId)?.name;
       setPriority(calcAutoPriority(type, dueDate, subjectName));
     }
-  }, [type, dueDate, subjectId, isAutoPriority, isOpen, subjects]);
+  };
+
+  const handleTypeChange = (newType: string) => {
+    setType(newType);
+    if (isAutoPriority) {
+      const subjectName = subjects?.find(s => s.id.toString() === subjectId)?.name;
+      setPriority(calcAutoPriority(newType, dueDate, subjectName));
+    }
+  };
+
+  const handleDueDateChange = (newDueDate: string) => {
+    setDueDate(newDueDate);
+    if (isAutoPriority) {
+      const subjectName = subjects?.find(s => s.id.toString() === subjectId)?.name;
+      setPriority(calcAutoPriority(type, newDueDate, subjectName));
+    }
+  };
 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -651,7 +669,7 @@ export function AssignmentsTab() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">المادة</label>
-                <Select value={subjectId} onValueChange={setSubjectId} required>
+                <Select value={subjectId} onValueChange={handleSubjectChange} required>
                   <SelectTrigger>
                     <SelectValue placeholder="اختر المادة" />
                   </SelectTrigger>
@@ -669,12 +687,12 @@ export function AssignmentsTab() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">تاريخ التسليم</label>
-                <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} required />
+                <Input type="date" value={dueDate} onChange={e => handleDueDateChange(e.target.value)} required />
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">النوع</label>
-                <Select value={type} onValueChange={setType} required>
+                <Select value={type} onValueChange={handleTypeChange} required>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent dir="rtl" position="popper">
                     {Object.entries(ASSIGNMENT_TYPE_LABELS).map(([k, v]) => (
@@ -694,7 +712,11 @@ export function AssignmentsTab() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setIsAutoPriority(true)}
+                      onClick={() => {
+                        setIsAutoPriority(true);
+                        const subjectName = subjects?.find(s => s.id.toString() === subjectId)?.name;
+                        setPriority(calcAutoPriority(type, dueDate, subjectName));
+                      }}
                       className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors"
                     >
                       <RotateCcw className="h-2.5 w-2.5" />

@@ -1,12 +1,14 @@
-import { useListSchedule, useGetScheduleConfig, useListEvents } from "@workspace/api-client-react";
+import { useListSchedule, useGetScheduleConfig, useListEvents, useListSubjects, useGetSettings } from "@workspace/api-client-react";
 import { LoadingPage } from "@/components/loading-state";
-import { AlertCircle, Clock, Coffee, Radio, Palmtree, Star, Flag, Cake, Sun, CalendarDays, ChevronRight, ChevronLeft, Send } from "lucide-react";
+import { AlertCircle, Clock, Coffee, Radio, Palmtree, Star, Flag, Cake, Sun, CalendarDays, ChevronRight, ChevronLeft, Send, MapPin, User, MessageCircle, Phone, BookOpen, Printer, Monitor, Sparkles, Download, FileText } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
+import { Link } from "wouter";
+import { SchedulePrintExportDialog } from "@/components/schedule-print-export-dialog";
 
 const DAYS = [
   { id: 0, name: "الأحد", short: "أحد" },
@@ -15,6 +17,12 @@ const DAYS = [
   { id: 3, name: "الأربعاء", short: "أربعاء" },
   { id: 4, name: "الخميس", short: "خميس" },
 ];
+
+function displayTeacherName(name: string | null | undefined) {
+  if (!name) return "";
+  if (name.startsWith("أ.") || name.startsWith("أ ") || name.startsWith("د.") || name.startsWith("د ") || name.startsWith("Mr.")) return name;
+  return `أ. ${name}`;
+}
 
 function addMinutes(time: string, minutes: number): string {
   const [h, m] = time.split(":").map(Number);
@@ -112,19 +120,23 @@ function getTodayDayId(now: Date): number {
 
 export default function Schedule() {
   const { data: slots = [], isLoading: slotsLoading, error } = useListSchedule();
+  const { data: subjects = [], isLoading: subjectsLoading } = useListSubjects();
   const { data: config, isLoading: configLoading } = useGetScheduleConfig();
   const { data: events = [] } = useListEvents({});
+  const { data: settingsData } = useGetSettings();
   const now = useNow();
   const todayStr = now.toISOString().split("T")[0];
 
   const todayDayId = getTodayDayId(now);
   const [selectedDay, setSelectedDay] = useState<number>(todayDayId);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printModalTab, setPrintModalTab] = useState<"print" | "wallpaper">("print");
 
-  if (slotsLoading || configLoading) return <LoadingPage />;
+  if (slotsLoading || configLoading || subjectsLoading) return <LoadingPage />;
 
   if (error) {
     return (
-      <Alert variant="destructive" className="my-8">
+      <Alert variant="destructive" className="my-8" dir="rtl">
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>خطأ</AlertTitle>
         <AlertDescription>حدث خطأ أثناء تحميل الجدول الدراسي.</AlertDescription>
@@ -147,8 +159,8 @@ export default function Schedule() {
   const activePeriodIndex = currentInfo?.type === "period" ? currentInfo.index : null;
   const isBreakNow = currentInfo?.type === "break";
 
-  const gridCols = `120px ${PERIODS.map((p) => (p === breakAfterPeriod && hasBreak ? "1fr 48px" : "1fr")).join(" ")}`;
-  const minW = 120 + displayCount * 90 + (hasBreak ? 48 : 0);
+  const gridCols = `110px ${PERIODS.map((p) => (p === breakAfterPeriod && hasBreak ? "minmax(115px, 1fr) 48px" : "minmax(115px, 1fr)")).join(" ")}`;
+  const minW = 110 + displayCount * 118 + (hasBreak ? 48 : 0);
 
   const container = {
     hidden: { opacity: 0 },
@@ -158,15 +170,44 @@ export default function Schedule() {
 
   const selectedDaySlots = slots.filter((s) => s.dayOfWeek === selectedDay);
 
+  // Group teachers from subjects for the bottom directory section
+  const teachersMap = new Map<string, { name: string; phone?: string; subjects: string[]; rooms: string[]; colors: string[] }>();
+  subjects.forEach((sub) => {
+    if (sub.teacherName) {
+      const key = sub.teacherName.trim();
+      const existing = teachersMap.get(key) || {
+        name: key,
+        phone: (sub as any).teacherPhone,
+        subjects: [],
+        rooms: [],
+        colors: [],
+      };
+      if (!existing.subjects.includes(sub.name)) existing.subjects.push(sub.name);
+      if (sub.color && !existing.colors.includes(sub.color)) existing.colors.push(sub.color);
+      
+      const subRooms: string[] = Array.isArray(sub.rooms) ? sub.rooms : (sub.room ? [sub.room] : []);
+      subRooms.forEach(r => {
+        if (!existing.rooms.includes(r)) existing.rooms.push(r);
+      });
+
+      if ((sub as any).teacherPhone && !existing.phone) {
+        existing.phone = (sub as any).teacherPhone;
+      }
+      teachersMap.set(key, existing);
+    }
+  });
+  const teachersList = Array.from(teachersMap.values());
+
   return (
     <motion.div
       className="space-y-6"
+      dir="rtl"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
     >
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <PageHeader icon={Clock} title="الجدول الدراسي" subtitle="استعرض الحصص الدراسية الأسبوعية">
+        <PageHeader icon={Clock} title="الجدول الدراسي" subtitle="استعرض الحصص الدراسية الأسبوعية والقاعات والمعلمين">
           <div className="flex flex-wrap gap-2 items-center">
             {activePeriodIndex !== null && (
               <Badge className="gap-1.5 py-1 px-3 rounded-full bg-primary text-primary-foreground animate-pulse text-xs">
@@ -186,6 +227,32 @@ export default function Schedule() {
             </Badge>
           </div>
         </PageHeader>
+
+        {/* Action Buttons for Print & Smart Wallpaper */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <Button
+            onClick={() => {
+              setPrintModalTab("print");
+              setIsPrintModalOpen(true);
+            }}
+            className="rounded-2xl gap-2 font-bold h-10 px-4 text-xs bg-primary text-primary-foreground shadow-sm hover:opacity-90 transition-all"
+          >
+            <Printer className="h-4 w-4" />
+            <span>طباعة وتصدير A4</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => {
+              setPrintModalTab("wallpaper");
+              setIsPrintModalOpen(true);
+            }}
+            className="rounded-2xl gap-2 font-bold h-10 px-4 text-xs border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/20 transition-all"
+          >
+            <Monitor className="h-4 w-4 text-indigo-500" />
+            <span>خلفية شاشة 16:9 (SVG / 4K)</span>
+          </Button>
+        </div>
       </div>
 
       {slots.length === 0 && (
@@ -238,17 +305,17 @@ export default function Schedule() {
           <div className="flex gap-1">
             <motion.button
               whileTap={{ scale: 0.9 }}
-              onClick={() => setSelectedDay((d) => (d === 4 ? 0 : d + 1))}
-              className="h-7 w-7 rounded-lg border border-border/50 flex items-center justify-center text-muted-foreground hover:bg-muted/50"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.9 }}
               onClick={() => setSelectedDay((d) => (d === 0 ? 4 : d - 1))}
               className="h-7 w-7 rounded-lg border border-border/50 flex items-center justify-center text-muted-foreground hover:bg-muted/50"
             >
               <ChevronRight className="h-3.5 w-3.5" />
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setSelectedDay((d) => (d === 4 ? 0 : d + 1))}
+              className="h-7 w-7 rounded-lg border border-border/50 flex items-center justify-center text-muted-foreground hover:bg-muted/50"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
             </motion.button>
           </div>
         </div>
@@ -261,59 +328,77 @@ export default function Schedule() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 16 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="space-y-2"
+            className="space-y-2.5"
           >
             {PERIODS.map((period, pIdx) => {
               const slot = selectedDaySlots.find((s) => s.periodNumber === period);
               const isActive = activePeriodIndex === pIdx && selectedDay === todayDayId;
               const isBreakRow = period === breakAfterPeriod && hasBreak;
+              const teacher = (slot as any)?.teacherName;
+              const room = (slot as any)?.room;
+
               return (
-                <div key={period} className="space-y-1.5">
+                <div key={period} className="space-y-2">
                   <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: pIdx * 0.04 }}
-                    className={`flex items-center gap-3 p-3 rounded-2xl border transition-all ${
+                    className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-all ${
                       isActive
-                        ? "border-primary/40 bg-primary/6 shadow-sm"
-                        : "border-border/40 bg-card"
+                        ? "border-primary/40 bg-primary/5 shadow-sm ring-1 ring-primary/20"
+                        : "border-border/50 bg-card"
                     }`}
                   >
                     {/* Period number */}
                     <div
-                      className={`shrink-0 h-9 w-9 rounded-xl flex flex-col items-center justify-center text-xs font-bold ${
-                        isActive ? "bg-primary text-primary-foreground" : "bg-muted/60 text-muted-foreground"
+                      className={`shrink-0 h-10 w-10 rounded-xl flex flex-col items-center justify-center text-xs font-bold ${
+                        isActive ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/70 text-muted-foreground"
                       }`}
                     >
                       <span>{period}</span>
-                      {isActive && <span className="text-[7px] font-normal opacity-80">الآن</span>}
+                      {isActive && <span className="text-[7px] font-normal opacity-90">الآن</span>}
                     </div>
 
                     {/* Time */}
-                    <div className="flex flex-col shrink-0 min-w-[52px]">
-                      <span className="text-[11px] font-mono text-muted-foreground" dir="ltr">{periodTimes[pIdx]?.start}</span>
-                      <span className="text-[10px] text-muted-foreground/50" dir="ltr">{periodTimes[pIdx]?.end}</span>
+                    <div className="flex flex-col shrink-0 min-w-[54px] pt-1">
+                      <span className="text-[11px] font-mono font-semibold text-foreground/80" dir="ltr">{periodTimes[pIdx]?.start}</span>
+                      <span className="text-[10px] text-muted-foreground/60" dir="ltr">{periodTimes[pIdx]?.end}</span>
                     </div>
 
-                    {/* Subject */}
+                    {/* Subject Card */}
                     <div className="flex-1 min-w-0">
                       {slot ? (
                         <div
-                          className="px-3 py-1.5 rounded-xl border text-sm font-semibold text-center"
+                          className="px-3.5 py-2.5 rounded-xl border text-sm font-semibold shadow-xs space-y-1.5"
                           style={{
-                            backgroundColor: `${slot.subjectColor}18`,
-                            color: slot.subjectColor,
-                            borderColor: `${slot.subjectColor}40`,
+                            backgroundColor: `${slot.subjectColor}12`,
+                            borderColor: `${slot.subjectColor}35`,
                           }}
                         >
-                          {slot.subjectName}
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="font-extrabold text-sm text-foreground">{slot.subjectName}</span>
+                            {room && (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-card/90 text-primary border border-border/50 shadow-2xs">
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                {room}
+                              </span>
+                            )}
+                          </div>
+
+                          {teacher && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <User className="h-3.5 w-3.5 text-primary shrink-0" />
+                              <span className="font-medium">{displayTeacherName(teacher)}</span>
+                            </div>
+                          )}
+
                           {slot.notes && (
-                            <p className="text-[10px] font-normal opacity-70 mt-0.5">{slot.notes}</p>
+                            <p className="text-[11px] font-normal text-muted-foreground/80 pt-0.5 border-t border-border/20">{slot.notes}</p>
                           )}
                         </div>
                       ) : (
-                        <div className="h-9 rounded-xl border border-dashed border-muted-foreground/15 flex items-center justify-center">
-                          <span className="text-xs text-muted-foreground/40">فراغ</span>
+                        <div className="h-10 rounded-xl border border-dashed border-muted-foreground/20 flex items-center justify-center">
+                          <span className="text-xs text-muted-foreground/40">حصة فراغ</span>
                         </div>
                       )}
                     </div>
@@ -325,14 +410,14 @@ export default function Schedule() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: pIdx * 0.04 + 0.05 }}
-                      className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border ${
+                      className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border ${
                         isBreakNow && selectedDay === todayDayId
-                          ? "border-amber-400/40 bg-amber-50/80 dark:bg-amber-900/20"
+                          ? "border-amber-400/40 bg-amber-50/90 dark:bg-amber-900/20 shadow-xs"
                           : "border-amber-200/40 dark:border-amber-800/30 bg-amber-50/40 dark:bg-amber-900/10"
                       }`}
                     >
-                      <Coffee className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                      <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                      <Coffee className="h-4 w-4 text-amber-500 shrink-0" />
+                      <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
                         استراحة — {breakDuration} دقيقة
                       </span>
                       {isBreakNow && selectedDay === todayDayId && (
@@ -350,7 +435,7 @@ export default function Schedule() {
       {/* ── Desktop: Full weekly grid ── */}
       <div className="hidden lg:block">
         <div className="relative">
-          <div className="overflow-x-auto pb-4 -mx-2 px-2 scrollbar-hide">
+          <div className="overflow-x-auto pb-4 -mx-1 px-1">
             <div
               className="border border-border/50 rounded-2xl overflow-hidden bg-card shadow-sm"
               style={{ minWidth: `${minW}px` }}
@@ -360,7 +445,7 @@ export default function Schedule() {
                 className="grid border-b border-border/50 bg-muted/40"
                 style={{ gridTemplateColumns: gridCols }}
               >
-                <div className="p-3 text-center text-xs font-bold text-muted-foreground border-l border-border/30">
+                <div className="p-3 text-center text-xs font-bold text-muted-foreground border-l border-border/30 flex items-center justify-center">
                   اليوم
                 </div>
                 {PERIODS.flatMap((p, idx) => {
@@ -368,21 +453,20 @@ export default function Schedule() {
                   const cells = [
                     <div
                       key={p}
-                      className={`border-l border-border/30 flex flex-col items-center justify-center p-2 transition-colors ${
-                        isActive ? "bg-primary/8 border-l-primary/40" : ""
+                      className={`border-l border-border/30 flex flex-col items-center justify-center p-2.5 transition-colors ${
+                        isActive ? "bg-primary/10 border-l-primary/40" : ""
                       }`}
                     >
-                      <span className={`text-xs font-bold ${isActive ? "text-primary" : "text-foreground"}`}>
-                        ح {p}
+                      <span className={`text-xs font-extrabold ${isActive ? "text-primary" : "text-foreground"}`}>
+                        الحصة {p}
                       </span>
-                      <span className="text-[10px] text-muted-foreground mt-0.5" dir="ltr">
-                        {periodTimes[idx]?.start}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground" dir="ltr">
-                        {periodTimes[idx]?.end}
-                      </span>
+                      <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground mt-0.5" dir="ltr">
+                        <span>{periodTimes[idx]?.start}</span>
+                        <span>-</span>
+                        <span>{periodTimes[idx]?.end}</span>
+                      </div>
                       {isActive && (
-                        <span className="mt-1 text-[9px] px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-bold animate-pulse">
+                        <span className="mt-1 text-[9px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-bold animate-pulse">
                           الآن
                         </span>
                       )}
@@ -391,8 +475,8 @@ export default function Schedule() {
                   if (p === breakAfterPeriod && hasBreak) {
                     cells.push(
                       <div key="break-hdr" className="border-l border-amber-200/60 dark:border-amber-800/40 flex flex-col items-center justify-center bg-amber-50/60 dark:bg-amber-900/15 p-1">
-                        <Coffee className="h-3.5 w-3.5 text-amber-500 mb-0.5" />
-                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold" style={{ writingMode: "vertical-rl" }}>
+                        <Coffee className="h-4 w-4 text-amber-500 mb-0.5" />
+                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-bold" style={{ writingMode: "vertical-rl" }}>
                           استراحة
                         </span>
                       </div>
@@ -419,27 +503,47 @@ export default function Schedule() {
                       const slot = slots.find(
                         (s) => s.dayOfWeek === day.id && s.periodNumber === period
                       );
-                      const isActive = activePeriodIndex === pIdx;
+                      const isActive = activePeriodIndex === pIdx && day.id === todayDayId;
+                      const teacher = (slot as any)?.teacherName;
+                      const room = (slot as any)?.room;
+
                       const cells = [
                         <div
                           key={period}
-                          className={`border-l flex items-center justify-center min-h-[80px] p-1.5 transition-colors ${
-                            isActive ? "bg-primary/6 border-l-primary/30" : "border-border/20"
+                          className={`border-l flex items-center justify-center min-h-[92px] p-1.5 transition-colors ${
+                            isActive ? "bg-primary/8 border-l-primary/40 ring-1 ring-inset ring-primary/20" : "border-border/25"
                           }`}
                         >
                           {slot ? (
                             <motion.div
                               variants={item}
-                              className="w-full h-full rounded-xl p-2 flex flex-col items-center justify-center text-center text-xs font-semibold leading-tight shadow-sm border transition-all"
+                              className="w-full h-full rounded-xl p-2 flex flex-col items-center justify-center text-center text-xs font-semibold leading-tight shadow-2xs border transition-all gap-0.5 group hover:shadow-xs"
                               style={{
-                                backgroundColor: `${slot.subjectColor}18`,
+                                backgroundColor: `${slot.subjectColor}14`,
                                 color: slot.subjectColor,
-                                borderColor: `${slot.subjectColor}40`,
+                                borderColor: `${slot.subjectColor}35`,
                               }}
                             >
-                              <span className="font-bold leading-tight text-xs">{slot.subjectName}</span>
-                              {slot.notes && (
-                                <span className="text-[10px] opacity-70 mt-0.5 font-normal">{slot.notes}</span>
+                              <span className="font-extrabold leading-tight text-xs text-foreground">{slot.subjectName}</span>
+                              
+                              {/* Teacher Name */}
+                              {teacher && (
+                                <span className="text-[10px] font-medium text-foreground/80 flex items-center gap-0.5 mt-0.5">
+                                  <User className="h-2.5 w-2.5 text-primary shrink-0" />
+                                  {displayTeacherName(teacher)}
+                                </span>
+                              )}
+
+                              {/* Room badge */}
+                              {room && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-card/90 text-foreground/90 border border-border/40 flex items-center gap-0.5 mt-0.5">
+                                  <MapPin className="h-2.5 w-2.5 text-primary shrink-0" />
+                                  {room}
+                                </span>
+                              )}
+
+                              {slot.notes && !room && (
+                                <span className="text-[9px] opacity-70 mt-0.5 font-normal truncate max-w-full">{slot.notes}</span>
                               )}
                             </motion.div>
                           ) : (
@@ -451,8 +555,8 @@ export default function Schedule() {
                       ];
                       if (period === breakAfterPeriod && hasBreak) {
                         cells.push(
-                          <div key={`break-${day.id}`} className="border-l border-amber-200/40 dark:border-amber-800/30 flex items-center justify-center bg-amber-50/40 dark:bg-amber-900/10 min-h-[80px]">
-                            <Coffee className="h-3.5 w-3.5 text-amber-400" />
+                          <div key={`break-${day.id}`} className="border-l border-amber-200/40 dark:border-amber-800/30 flex items-center justify-center bg-amber-50/40 dark:bg-amber-900/10 min-h-[92px]">
+                            <Coffee className="h-3.5 w-3.5 text-amber-500" />
                           </div>
                         );
                       }
@@ -469,7 +573,7 @@ export default function Schedule() {
         <div className="flex items-center gap-2 text-xs text-muted-foreground px-1 mt-2">
           <Clock className="h-3.5 w-3.5 shrink-0" />
           <span>
-            بداية اليوم: <span dir="ltr" className="font-mono font-semibold">{startTime}</span>
+            بداية اليوم: <span dir="ltr" className="font-mono font-semibold text-foreground">{startTime}</span>
             {" · "}
             مدة الحصة: {periodDuration} دقيقة
             {" · "}
@@ -478,15 +582,85 @@ export default function Schedule() {
         </div>
       </div>
 
-      {/* Mobile info */}
-      <div className="lg:hidden flex items-center gap-2 text-xs text-muted-foreground px-1">
-        <Clock className="h-3.5 w-3.5 shrink-0" />
-        <span>
-          بداية: <span dir="ltr" className="font-mono font-semibold">{startTime}</span>
-          {" · "}
-          {periodDuration} د/حصة
-        </span>
-      </div>
+      {/* ── Teachers & Rooms Directory Section ── */}
+      {teachersList.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-3xl border border-border/60 bg-card p-5 sm:p-6 shadow-sm space-y-4"
+        >
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <User className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-foreground">دليل معلمي المواد والقاعات</h3>
+                <p className="text-xs text-muted-foreground">أسماء المعلمين، أرقام التواصل، والقاعات المرتبطة بالمواد</p>
+              </div>
+            </div>
+
+            <Link href="/teacher">
+              <Button variant="outline" size="sm" className="rounded-xl gap-1.5 text-xs font-bold">
+                <span>صفحة المعلمين والأسئلة</span>
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
+            {teachersList.map((t, idx) => (
+              <div
+                key={idx}
+                className="p-4 rounded-2xl border border-border/50 bg-muted/20 hover:bg-muted/40 transition-colors flex flex-col justify-between gap-3"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-foreground">{displayTeacherName(t.name)}</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t.subjects.join("، ")}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      {t.colors.slice(0, 3).map((col, i) => (
+                        <span key={i} className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: col }} />
+                      ))}
+                    </div>
+                  </div>
+
+                  {t.rooms.length > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs text-primary font-medium bg-card p-2 rounded-xl border border-border/40">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      <span>القاعات: <strong>{t.rooms.join(" · ")}</strong></span>
+                    </div>
+                  )}
+                </div>
+
+                {t.phone ? (
+                  <div className="flex items-center gap-2 pt-2 border-t border-border/30">
+                    <a
+                      href={`https://wa.me/${t.phone}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 text-xs font-bold hover:bg-emerald-100 transition-colors"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      واتساب
+                    </a>
+                    <a
+                      href={`tel:${t.phone}`}
+                      className="inline-flex items-center justify-center h-8 w-8 rounded-xl bg-card border border-border/50 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Phone className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground/60 italic pt-1">لا يتوفر رقم هاتف مسجل</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* ── Occasions Section ── */}
       {events.length > 0 && (() => {
@@ -566,6 +740,21 @@ export default function Schedule() {
           </div>
         );
       })()}
+
+      {/* Schedule Print & Smart Screen Wallpaper Dialog */}
+      <SchedulePrintExportDialog
+        open={isPrintModalOpen}
+        onOpenChange={setIsPrintModalOpen}
+        slots={slots}
+        subjects={subjects}
+        config={config}
+        initialTab={printModalTab}
+        defaultSchoolName={
+          settingsData?.showSchoolName !== false && settingsData?.schoolName?.trim()
+            ? settingsData.schoolName.trim()
+            : "مدرسة الجش الثانوية"
+        }
+      />
     </motion.div>
   );
 }
