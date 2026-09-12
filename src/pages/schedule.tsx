@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Link } from "wouter";
 import { SchedulePrintExportDialog } from "@/components/schedule-print-export-dialog";
+import { formatTime12h, formatTimeRangeRTL, getSubjectDecoration } from "@/lib/schedule-utils";
 
 const DAYS = [
   { id: 0, name: "الأحد", short: "أحد" },
@@ -159,8 +160,8 @@ export default function Schedule() {
   const activePeriodIndex = currentInfo?.type === "period" ? currentInfo.index : null;
   const isBreakNow = currentInfo?.type === "break";
 
-  const gridCols = `110px ${PERIODS.map((p) => (p === breakAfterPeriod && hasBreak ? "minmax(115px, 1fr) 48px" : "minmax(115px, 1fr)")).join(" ")}`;
-  const minW = 110 + displayCount * 118 + (hasBreak ? 48 : 0);
+  const gridCols = `110px ${PERIODS.map((p) => (p === breakAfterPeriod && hasBreak ? "minmax(115px, 1fr) minmax(58px, 66px)" : "minmax(115px, 1fr)")).join(" ")}`;
+  const minW = 110 + displayCount * 118 + (hasBreak ? 62 : 0);
 
   const container = {
     hidden: { opacity: 0 },
@@ -250,7 +251,7 @@ export default function Schedule() {
             className="rounded-2xl gap-2 font-bold h-10 px-4 text-xs border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/20 transition-all"
           >
             <Monitor className="h-4 w-4 text-indigo-500" />
-            <span>خلفية شاشة 16:9 (SVG / 4K)</span>
+            <span>الجدول المصمم (شاشة 16:9 / 4K)</span>
           </Button>
         </div>
       </div>
@@ -359,44 +360,66 @@ export default function Schedule() {
                       {isActive && <span className="text-[7px] font-normal opacity-90">الآن</span>}
                     </div>
 
-                    {/* Time */}
-                    <div className="flex flex-col shrink-0 min-w-[54px] pt-1">
-                      <span className="text-[11px] font-mono font-semibold text-foreground/80" dir="ltr">{periodTimes[pIdx]?.start}</span>
-                      <span className="text-[10px] text-muted-foreground/60" dir="ltr">{periodTimes[pIdx]?.end}</span>
+                    {/* Time (12-hour RTL) */}
+                    <div className="flex flex-col shrink-0 min-w-[76px] pt-1 text-right" dir="rtl">
+                      <div className="flex items-center gap-1 text-[11px] font-black text-foreground">
+                        <span className="text-[9px] text-muted-foreground font-bold">من</span>
+                        <span>{formatTime12h(periodTimes[pIdx]?.start)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground">
+                        <span className="text-[9px] text-muted-foreground/70 font-semibold">إلى</span>
+                        <span>{formatTime12h(periodTimes[pIdx]?.end)}</span>
+                      </div>
                     </div>
 
                     {/* Subject Card */}
                     <div className="flex-1 min-w-0">
-                      {slot ? (
-                        <div
-                          className="px-3.5 py-2.5 rounded-xl border text-sm font-semibold shadow-xs space-y-1.5"
-                          style={{
-                            backgroundColor: `${slot.subjectColor}12`,
-                            borderColor: `${slot.subjectColor}35`,
-                          }}
-                        >
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <span className="font-extrabold text-sm text-foreground">{slot.subjectName}</span>
-                            {room && (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-card/90 text-primary border border-border/50 shadow-2xs">
-                                <MapPin className="h-3 w-3 shrink-0" />
-                                {room}
-                              </span>
+                      {slot ? (() => {
+                        const deco = getSubjectDecoration(slot.subjectName, slot.subjectColor);
+                        const DecoIcon = deco.icon;
+                        const cardColor = slot.subjectColor || deco.baseColor;
+                        return (
+                          <div
+                            className="px-3.5 py-2.5 rounded-2xl border text-sm font-semibold shadow-2xs space-y-2 transition-all hover:shadow-xs relative overflow-hidden"
+                            style={{
+                              backgroundColor: `${cardColor}0d`,
+                              borderColor: `${cardColor}30`,
+                            }}
+                          >
+                            <div className="flex items-center justify-between gap-2 flex-wrap relative z-10">
+                              <div className="flex items-center gap-2">
+                                <div className="h-7 w-7 rounded-xl flex items-center justify-center shrink-0 bg-background/80 shadow-2xs" style={{ color: cardColor }}>
+                                  <DecoIcon className="h-4 w-4" />
+                                </div>
+                                <span
+                                  className="font-graphik-black font-black text-base text-foreground tracking-tight"
+                                  style={{ fontFamily: "'Graphik Arabic Black', 'Graphik Arabic', 'Thmanyah', sans-serif", fontWeight: 900 }}
+                                >
+                                  {slot.subjectName}
+                                </span>
+                              </div>
+
+                              {room && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-background/90 text-primary border border-border/50 shadow-2xs">
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  {room}
+                                </span>
+                              )}
+                            </div>
+
+                            {teacher && (
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground relative z-10">
+                                <User className="h-3.5 w-3.5 text-primary shrink-0" />
+                                <span>{displayTeacherName(teacher)}</span>
+                              </div>
+                            )}
+
+                            {slot.notes && (
+                              <p className="text-[11px] font-normal text-muted-foreground/80 pt-0.5 border-t border-border/20 relative z-10">{slot.notes}</p>
                             )}
                           </div>
-
-                          {teacher && (
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <User className="h-3.5 w-3.5 text-primary shrink-0" />
-                              <span className="font-medium">{displayTeacherName(teacher)}</span>
-                            </div>
-                          )}
-
-                          {slot.notes && (
-                            <p className="text-[11px] font-normal text-muted-foreground/80 pt-0.5 border-t border-border/20">{slot.notes}</p>
-                          )}
-                        </div>
-                      ) : (
+                        );
+                      })() : (
                         <div className="h-10 rounded-xl border border-dashed border-muted-foreground/20 flex items-center justify-center">
                           <span className="text-xs text-muted-foreground/40">حصة فراغ</span>
                         </div>
@@ -460,10 +483,15 @@ export default function Schedule() {
                       <span className={`text-xs font-extrabold ${isActive ? "text-primary" : "text-foreground"}`}>
                         الحصة {p}
                       </span>
-                      <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground mt-0.5" dir="ltr">
-                        <span>{periodTimes[idx]?.start}</span>
-                        <span>-</span>
-                        <span>{periodTimes[idx]?.end}</span>
+                      <div className="flex flex-col items-center justify-center text-[9.5px] font-bold leading-tight mt-1" dir="rtl">
+                        <div className="flex items-center gap-0.5 text-foreground/90 font-black whitespace-nowrap">
+                          <span className="text-[8px] text-muted-foreground font-semibold">من</span>
+                          <span>{formatTime12h(periodTimes[idx]?.start)}</span>
+                        </div>
+                        <div className="flex items-center gap-0.5 text-muted-foreground font-bold whitespace-nowrap">
+                          <span className="text-[8px] text-muted-foreground/70 font-semibold">إلى</span>
+                          <span>{formatTime12h(periodTimes[idx]?.end)}</span>
+                        </div>
                       </div>
                       {isActive && (
                         <span className="mt-1 text-[9px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-bold animate-pulse">
@@ -474,10 +502,10 @@ export default function Schedule() {
                   ];
                   if (p === breakAfterPeriod && hasBreak) {
                     cells.push(
-                      <div key="break-hdr" className="border-l border-amber-200/60 dark:border-amber-800/40 flex flex-col items-center justify-center bg-amber-50/60 dark:bg-amber-900/15 p-1">
-                        <Coffee className="h-4 w-4 text-amber-500 mb-0.5" />
-                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-bold" style={{ writingMode: "vertical-rl" }}>
-                          استراحة
+                      <div key="break-hdr" className="border-l border-amber-300/40 dark:border-amber-800/40 flex flex-col items-center justify-center bg-amber-500/10 dark:bg-amber-900/20 p-2 overflow-visible">
+                        <Coffee className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mb-1" />
+                        <span className="text-[10px] text-amber-700 dark:text-amber-300 font-black tracking-wide">
+                          فسحة
                         </span>
                       </div>
                     );
@@ -510,44 +538,63 @@ export default function Schedule() {
                       const cells = [
                         <div
                           key={period}
-                          className={`border-l flex items-center justify-center min-h-[92px] p-1.5 transition-colors ${
+                          className={`border-l flex items-center justify-center min-h-[96px] p-1.5 transition-colors ${
                             isActive ? "bg-primary/8 border-l-primary/40 ring-1 ring-inset ring-primary/20" : "border-border/25"
                           }`}
                         >
-                          {slot ? (
-                            <motion.div
-                              variants={item}
-                              className="w-full h-full rounded-xl p-2 flex flex-col items-center justify-center text-center text-xs font-semibold leading-tight shadow-2xs border transition-all gap-0.5 group hover:shadow-xs"
-                              style={{
-                                backgroundColor: `${slot.subjectColor}14`,
-                                color: slot.subjectColor,
-                                borderColor: `${slot.subjectColor}35`,
-                              }}
-                            >
-                              <span className="font-extrabold leading-tight text-xs text-foreground">{slot.subjectName}</span>
-                              
-                              {/* Teacher Name */}
-                              {teacher && (
-                                <span className="text-[10px] font-medium text-foreground/80 flex items-center gap-0.5 mt-0.5">
-                                  <User className="h-2.5 w-2.5 text-primary shrink-0" />
-                                  {displayTeacherName(teacher)}
-                                </span>
-                              )}
+                          {slot ? (() => {
+                            const deco = getSubjectDecoration(slot.subjectName, slot.subjectColor);
+                            const DecoIcon = deco.icon;
+                            const cardColor = slot.subjectColor || deco.baseColor;
+                            return (
+                              <motion.div
+                                variants={item}
+                                className="w-full h-full rounded-2xl p-2.5 flex flex-col items-center justify-between text-center text-xs font-semibold leading-tight shadow-2xs border transition-all group hover:shadow-sm hover:scale-[1.02] relative overflow-hidden"
+                                style={{
+                                  backgroundColor: `${cardColor}0d`,
+                                  borderColor: `${cardColor}35`,
+                                }}
+                              >
+                                {/* Decorative Background Watermark Motif */}
+                                <DecoIcon
+                                  className="absolute -bottom-2 -left-2 w-11 h-11 pointer-events-none opacity-15 transition-transform group-hover:scale-110"
+                                  style={{ color: cardColor }}
+                                />
 
-                              {/* Room badge */}
-                              {room && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-card/90 text-foreground/90 border border-border/40 flex items-center gap-0.5 mt-0.5">
-                                  <MapPin className="h-2.5 w-2.5 text-primary shrink-0" />
-                                  {room}
-                                </span>
-                              )}
+                                <div className="flex-1 flex items-center justify-center w-full py-1 relative z-10">
+                                  <span
+                                    className="font-graphik-black font-black leading-tight text-xs text-foreground line-clamp-2 w-full text-center px-0.5 tracking-tight"
+                                    style={{ fontFamily: "'Graphik Arabic Black', 'Graphik Arabic', 'Thmanyah', sans-serif", fontWeight: 900 }}
+                                  >
+                                    {slot.subjectName}
+                                  </span>
+                                </div>
+                                
+                                <div className="flex flex-col items-center gap-0.5 w-full mt-1 relative z-10">
+                                  {/* Teacher Name */}
+                                  {teacher && (
+                                    <span className="text-[9.5px] font-semibold text-foreground/80 flex items-center gap-0.5 truncate max-w-full">
+                                      <User className="h-2.5 w-2.5 text-primary shrink-0" />
+                                      {displayTeacherName(teacher)}
+                                    </span>
+                                  )}
 
-                              {slot.notes && !room && (
-                                <span className="text-[9px] opacity-70 mt-0.5 font-normal truncate max-w-full">{slot.notes}</span>
-                              )}
-                            </motion.div>
-                          ) : (
-                            <div className="w-full h-full rounded-xl border border-dashed border-muted-foreground/15 flex items-center justify-center">
+                                  {/* Room badge */}
+                                  {room && (
+                                    <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded-md bg-background/90 text-primary border border-border/40 flex items-center gap-0.5 shadow-2xs">
+                                      <MapPin className="h-2.5 w-2.5 shrink-0" />
+                                      {room}
+                                    </span>
+                                  )}
+
+                                  {slot.notes && !room && (
+                                    <span className="text-[8.5px] opacity-70 font-normal truncate max-w-full">{slot.notes}</span>
+                                  )}
+                                </div>
+                              </motion.div>
+                            );
+                          })() : (
+                            <div className="w-full h-full rounded-2xl border border-dashed border-muted-foreground/15 flex items-center justify-center">
                               <span className="text-[10px] text-muted-foreground/40">—</span>
                             </div>
                           )}
@@ -555,8 +602,9 @@ export default function Schedule() {
                       ];
                       if (period === breakAfterPeriod && hasBreak) {
                         cells.push(
-                          <div key={`break-${day.id}`} className="border-l border-amber-200/40 dark:border-amber-800/30 flex items-center justify-center bg-amber-50/40 dark:bg-amber-900/10 min-h-[92px]">
-                            <Coffee className="h-3.5 w-3.5 text-amber-500" />
+                          <div key={`break-${day.id}`} className="border-l border-amber-300/30 dark:border-amber-800/30 flex flex-col items-center justify-center bg-amber-500/5 dark:bg-amber-900/10 p-2 overflow-visible min-h-[92px]">
+                            <Coffee className="h-4 w-4 text-amber-600/70 dark:text-amber-400/70 shrink-0 mb-1" />
+                            <span className="text-[9px] font-bold text-amber-700/60 dark:text-amber-300/60">استراحة</span>
                           </div>
                         );
                       }

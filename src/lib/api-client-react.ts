@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { doc, onSnapshot, setDoc, getDoc, getDocs, collection, serverTimestamp } from "firebase/firestore";
 import { db, safeFirestoreWrite } from "./firebase";
+import { idbSet, idbGet, safeLocalStorageSet } from "./indexed-db";
 
 // Debounce map for batching app_data writes to Firestore and saving quota
 const writeDebounceTimers = new Map<string, any>();
@@ -33,23 +34,32 @@ if (typeof window !== "undefined") {
 export function usePersistentState<T>(key: string, initialValue: T): [T, (val: T | ((prev: T) => T)) => void] {
   const [state, setState] = useState<T>(() => {
     try {
+      if (key === "flashcards") {
+        const item = localStorage.getItem(`app_data_${key}`) || localStorage.getItem("talented_english_flashcards_v1");
+        if (item) {
+          const parsed = JSON.parse(item);
+          if (Array.isArray(parsed) && Array.isArray(initialValue)) {
+            const defaultWords = new Set((initialValue as any[]).map(c => c?.word?.trim()?.toLowerCase()));
+            const isCustomCard = (c: any) =>
+              c && c.id && (
+                c.isCustom ||
+                c.isPersonal ||
+                String(c.id).startsWith("custom_") ||
+                String(c.id).startsWith("fc-admin-") ||
+                String(c.id).startsWith("fc-personal-") ||
+                String(c.id).startsWith("fc-ai-") ||
+                String(c.id).startsWith("fc-imported-")
+              );
+            const customCards = parsed.filter((c: any) => isCustomCard(c) && !defaultWords.has(c?.word?.trim()?.toLowerCase()));
+            return [...(initialValue as any[]), ...customCards] as unknown as T;
+          }
+        }
+        return initialValue;
+      }
+
       const item = localStorage.getItem(`app_data_${key}`);
       if (item) {
-        const parsed = JSON.parse(item);
-        if (key === "flashcards" && Array.isArray(parsed) && parsed.length === 0 && Array.isArray(initialValue) && initialValue.length > 0) {
-          return initialValue;
-        }
-        return parsed;
-      }
-      if (key === "flashcards") {
-        const fcItem = localStorage.getItem("talented_english_flashcards_v1");
-        if (fcItem) {
-          const parsed = JSON.parse(fcItem);
-          if (Array.isArray(parsed) && parsed.length === 0 && Array.isArray(initialValue) && initialValue.length > 0) {
-            return initialValue;
-          }
-          return parsed;
-        }
+        return JSON.parse(item);
       }
       if (key === "platforms") {
         const platItem = localStorage.getItem("talented_school_custom_platforms_v1");
@@ -82,40 +92,46 @@ export function usePersistentState<T>(key: string, initialValue: T): [T, (val: T
 
               // Automatic healing and curriculum sync for flashcards
               if (key === "flashcards" && Array.isArray(initialValue)) {
-                if (Array.isArray(val) && val.length === 0) {
-                  val = initialValue;
-                  queueDebouncedFirestoreWrite(key, val);
-                } else if (Array.isArray(val)) {
-                  const existingIds = new Set(val.map((c: any) => c?.id));
-                  const existingWords = new Set(val.map((c: any) => c?.word?.trim()?.toLowerCase()));
-                  let hasNew = false;
-                  const merged = [...val];
-                  for (const card of (initialValue as any[])) {
-                    if (!card) continue;
-                    const normWord = card.word?.trim()?.toLowerCase();
-                    if (!existingIds.has(card.id) && !existingWords.has(normWord)) {
-                      merged.push(card);
-                      existingIds.add(card.id);
-                      if (normWord) existingWords.add(normWord);
-                      hasNew = true;
-                    }
-                  }
-                  if (hasNew) {
-                    val = merged;
+                if (Array.isArray(val)) {
+                  const defaultWords = new Set((initialValue as any[]).map(c => c?.word?.trim()?.toLowerCase()));
+                  const defaultIds = new Set((initialValue as any[]).map(c => c?.id));
+                  const isCustomCard = (c: any) =>
+                    c && c.id && (
+                      c.isCustom ||
+                      c.isPersonal ||
+                      String(c.id).startsWith("custom_") ||
+                      String(c.id).startsWith("fc-admin-") ||
+                      String(c.id).startsWith("fc-personal-") ||
+                      String(c.id).startsWith("fc-ai-") ||
+                      String(c.id).startsWith("fc-imported-")
+                    );
+                  const customCards = val.filter((c: any) => isCustomCard(c) && !defaultWords.has(c.word?.trim()?.toLowerCase()));
+                  const cleanDefaults = (initialValue as any[]);
+                  const finalCards = [...cleanDefaults, ...customCards.filter((c: any) => !cleanDefaults.some(d => d.id === c.id))];
+
+                  // Check if stored value had legacy/obsolete cards or missing standard cards
+                  const hadObsolete = val.some((c: any) => c?.id && !defaultIds.has(c.id) && !customCards.some(custom => custom.id === c.id));
+                  const isMissingDefaults = cleanDefaults.some(d => !val.some((c: any) => c?.id === d.id));
+                  
+                  if (hadObsolete || isMissingDefaults || val.length === 0) {
+                    val = finalCards;
                     queueDebouncedFirestoreWrite(key, val);
                   }
+                } else {
+                  val = initialValue;
+                  queueDebouncedFirestoreWrite(key, val);
                 }
               }
 
               setState(val);
               try {
-                localStorage.setItem(`app_data_${key}`, JSON.stringify(val));
+                idbSet(`app_data_${key}`, val);
+                safeLocalStorageSet(`app_data_${key}`, val);
                 if (key === "flashcards") {
-                  localStorage.setItem("talented_english_flashcards_v1", JSON.stringify(val));
+                  safeLocalStorageSet("talented_english_flashcards_v1", val);
                   window.dispatchEvent(new CustomEvent("flashcards_storage_change", { detail: { flashcards: val } }));
                 } else if (key === "platforms") {
-                  localStorage.setItem("talented_school_custom_platforms_v1", JSON.stringify(val));
-                  localStorage.setItem("custom_educational_platforms_v3", JSON.stringify(val));
+                  safeLocalStorageSet("talented_school_custom_platforms_v1", val);
                   window.dispatchEvent(new CustomEvent("platforms_storage_change", { detail: { platforms: val } }));
                 }
               } catch {}
@@ -165,22 +181,25 @@ export function usePersistentState<T>(key: string, initialValue: T): [T, (val: T
     const next = typeof val === "function" ? (val as any)(prev) : val;
     
     try {
-      localStorage.setItem(`app_data_${key}`, JSON.stringify(next));
+      // 1. Asynchronously store in IndexedDB (no 5MB quota ceiling)
+      idbSet(`app_data_${key}`, next);
+
+      // 2. Safely store in localStorage
+      safeLocalStorageSet(`app_data_${key}`, next);
       if (key === "flashcards") {
-        localStorage.setItem("talented_english_flashcards_v1", JSON.stringify(next));
+        safeLocalStorageSet("talented_english_flashcards_v1", next);
         window.dispatchEvent(new CustomEvent("flashcards_storage_change", { detail: { flashcards: next } }));
       } else if (key === "platforms") {
-        localStorage.setItem("talented_school_custom_platforms_v1", JSON.stringify(next));
-        localStorage.setItem("custom_educational_platforms_v3", JSON.stringify(next));
+        safeLocalStorageSet("talented_school_custom_platforms_v1", next);
         window.dispatchEvent(new CustomEvent("platforms_storage_change", { detail: { platforms: next } }));
       } else if (key === "study_files") {
-        localStorage.setItem("talented_school_custom_files_v1", JSON.stringify(next));
-        localStorage.setItem("app_data_study_files", JSON.stringify(next));
+        safeLocalStorageSet("talented_school_custom_files_v1", next);
+        safeLocalStorageSet("app_data_study_files", next);
         window.dispatchEvent(new CustomEvent("app_file_updated", { detail: next }));
       } else if (key === "channels") {
         window.dispatchEvent(new CustomEvent("channels_storage_change", { detail: { channels: next } }));
       } else if (key === "polls" || key === "poll_votes") {
-        localStorage.setItem("talented_school_polls_cache_v3", JSON.stringify(next));
+        safeLocalStorageSet("talented_school_polls_cache_v3", next);
         window.dispatchEvent(new CustomEvent("polls_data_change", { detail: { key, value: next } }));
       }
     } catch {}
@@ -288,7 +307,8 @@ export async function pullAllCloudDataToLocal(): Promise<{ success: boolean; key
       if (snap.exists()) {
         const data = snap.data();
         if (data && data.value !== undefined) {
-          localStorage.setItem(`app_data_${key}`, JSON.stringify(data.value));
+          idbSet(`app_data_${key}`, data.value);
+          safeLocalStorageSet(`app_data_${key}`, data.value);
           window.dispatchEvent(new CustomEvent("app_data_change", { detail: { key, value: data.value } }));
           updatedKeys.push(key);
         }
@@ -315,8 +335,13 @@ export async function exportAllAppData(): Promise<Record<string, any>> {
       if (snap.exists() && snap.data()?.value !== undefined) {
         exportBundle[key] = snap.data()?.value;
       } else {
-        const raw = localStorage.getItem(`app_data_${key}`);
-        if (raw) exportBundle[key] = JSON.parse(raw);
+        const idbVal = await idbGet(`app_data_${key}`);
+        if (idbVal !== null && idbVal !== undefined) {
+          exportBundle[key] = idbVal;
+        } else {
+          const raw = localStorage.getItem(`app_data_${key}`);
+          if (raw) exportBundle[key] = JSON.parse(raw);
+        }
       }
     } catch {
       const raw = localStorage.getItem(`app_data_${key}`);
@@ -326,8 +351,13 @@ export async function exportAllAppData(): Promise<Record<string, any>> {
 
   // Also include custom files
   try {
-    const rawFiles = localStorage.getItem("talented_school_custom_files_v1");
-    if (rawFiles) exportBundle["customFiles"] = JSON.parse(rawFiles);
+    const idbFiles = await idbGet("study_files");
+    if (idbFiles) {
+      exportBundle["customFiles"] = idbFiles;
+    } else {
+      const rawFiles = localStorage.getItem("talented_school_custom_files_v1") || localStorage.getItem("app_data_study_files");
+      if (rawFiles) exportBundle["customFiles"] = JSON.parse(rawFiles);
+    }
   } catch {}
 
   return exportBundle;
@@ -341,7 +371,8 @@ export async function importAllAppData(bundle: Record<string, any>): Promise<{ s
     if (bundle[key] !== undefined) {
       const val = bundle[key];
       try {
-        localStorage.setItem(`app_data_${key}`, JSON.stringify(val));
+        idbSet(`app_data_${key}`, val);
+        safeLocalStorageSet(`app_data_${key}`, val);
       } catch {}
       window.dispatchEvent(new CustomEvent("app_data_change", { detail: { key, value: val } }));
 
@@ -355,7 +386,9 @@ export async function importAllAppData(bundle: Record<string, any>): Promise<{ s
 
   if (bundle.customFiles && Array.isArray(bundle.customFiles)) {
     try {
-      localStorage.setItem("talented_school_custom_files_v1", JSON.stringify(bundle.customFiles));
+      idbSet("study_files", bundle.customFiles);
+      safeLocalStorageSet("talented_school_custom_files_v1", bundle.customFiles);
+      safeLocalStorageSet("app_data_study_files", bundle.customFiles);
       for (const f of bundle.customFiles) {
         if (f.id) {
           try {
@@ -372,11 +405,11 @@ export async function importAllAppData(bundle: Record<string, any>): Promise<{ s
 
 // Initial default seed data
 const defaultSubjects = [
-  { id: 1, name: "الرياضيات", color: "#3b82f6", teacherName: "أ. محمد علي", teacherPhone: "0501234567", rooms: ["قاعة 101", "مختبر الرياضيات 1"] },
-  { id: 2, name: "الفيزياء", color: "#8b5cf6", teacherName: "أ. أحمد محمود", teacherPhone: "0502345678", rooms: ["معمل الفيزياء", "مختبر العلوم 2"] },
-  { id: 3, name: "الكيمياء", color: "#ec4899", teacherName: "د. خالد السعيد", teacherPhone: "0503456789", rooms: ["المختبر الكيميائي"] },
-  { id: 4, name: "اللغة العربية", color: "#f59e0b", teacherName: "أ. عمر الفاروق", teacherPhone: "0504567890", rooms: ["قاعة 102", "القاعة الكبرى"] },
-  { id: 5, name: "اللغة الإنجليزية", color: "#10b981", teacherName: "Mr. Smith", teacherPhone: "0505678901", rooms: ["معمل اللغات الصوتية"] },
+  { id: 1, name: "الرياضيات", color: "#1d4ed8", teacherName: "أ. محمد علي", teacherPhone: "0501234567", rooms: ["قاعة 101", "مختبر الرياضيات 1"] },
+  { id: 2, name: "الفيزياء", color: "#7e22ce", teacherName: "أ. أحمد محمود", teacherPhone: "0502345678", rooms: ["معمل الفيزياء", "مختبر العلوم 2"] },
+  { id: 3, name: "الكيمياء", color: "#be123c", teacherName: "د. خالد السعيد", teacherPhone: "0503456789", rooms: ["المختبر الكيميائي"] },
+  { id: 4, name: "اللغة العربية", color: "#d97706", teacherName: "أ. عمر الفاروق", teacherPhone: "0504567890", rooms: ["قاعة 102", "القاعة الكبرى"] },
+  { id: 5, name: "اللغة الإنجليزية", color: "#0284c7", teacherName: "Mr. Smith", teacherPhone: "0505678901", rooms: ["معمل اللغات الصوتية"] },
 ];
 
 const defaultAssignments = [
@@ -388,7 +421,7 @@ const defaultAssignments = [
     priority: "HIGH",
     dueDate: new Date(Date.now() + 86400000 * 2).toISOString(),
     subjectName: "الرياضيات",
-    subjectColor: "#3b82f6",
+    subjectColor: "#1d4ed8",
     attachments: [],
     checklist: ["مراجعة النظرية", "حل تمرين 1-5", "حل تمرين 6-10"],
   },
@@ -400,7 +433,7 @@ const defaultAssignments = [
     priority: "MEDIUM",
     dueDate: new Date(Date.now() + 86400000 * 4).toISOString(),
     subjectName: "الفيزياء",
-    subjectColor: "#8b5cf6",
+    subjectColor: "#7e22ce",
     attachments: [],
     checklist: ["جمع المصادر", "كتابة المقدمة", "مراجعة الصياغة"],
   },
@@ -412,7 +445,7 @@ const defaultAssignments = [
     priority: "HIGH",
     dueDate: new Date(Date.now() + 86400000 * 6).toISOString(),
     subjectName: "الكيمياء",
-    subjectColor: "#ec4899",
+    subjectColor: "#be123c",
     attachments: [],
     checklist: ["اختيار المركبات", "تصميم الشرائح"],
   },
@@ -424,23 +457,23 @@ const defaultAssignments = [
     priority: "LOW",
     dueDate: new Date(Date.now() + 86400000 * 8).toISOString(),
     subjectName: "اللغة العربية",
-    subjectColor: "#f59e0b",
+    subjectColor: "#d97706",
     attachments: [],
     checklist: [],
   },
 ];
 
 const defaultScheduleSlots = [
-  { id: 1, dayOfWeek: 0, periodNumber: 1, subjectName: "الرياضيات", subjectColor: "#3b82f6", notes: "القاعة 101" },
-  { id: 2, dayOfWeek: 0, periodNumber: 2, subjectName: "الفيزياء", subjectColor: "#8b5cf6", notes: "معمل الفيزياء" },
-  { id: 3, dayOfWeek: 0, periodNumber: 3, subjectName: "الكيمياء", subjectColor: "#ec4899", notes: "المختبر" },
-  { id: 4, dayOfWeek: 0, periodNumber: 4, subjectName: "اللغة العربية", subjectColor: "#f59e0b", notes: "القاعة 102" },
-  { id: 5, dayOfWeek: 0, periodNumber: 5, subjectName: "اللغة الإنجليزية", subjectColor: "#10b981", notes: "معمل اللغات" },
-  { id: 6, dayOfWeek: 1, periodNumber: 1, subjectName: "الفيزياء", subjectColor: "#8b5cf6", notes: "معمل الفيزياء" },
-  { id: 7, dayOfWeek: 1, periodNumber: 2, subjectName: "الرياضيات", subjectColor: "#3b82f6", notes: "القاعة 101" },
-  { id: 8, dayOfWeek: 2, periodNumber: 1, subjectName: "الكيمياء", subjectColor: "#ec4899", notes: "المختبر" },
-  { id: 9, dayOfWeek: 3, periodNumber: 1, subjectName: "اللغة العربية", subjectColor: "#f59e0b", notes: "القاعة 102" },
-  { id: 10, dayOfWeek: 4, periodNumber: 1, subjectName: "الرياضيات", subjectColor: "#3b82f6", notes: "القاعة 101" },
+  { id: 1, dayOfWeek: 0, periodNumber: 1, subjectName: "الرياضيات", subjectColor: "#1d4ed8", notes: "القاعة 101" },
+  { id: 2, dayOfWeek: 0, periodNumber: 2, subjectName: "الفيزياء", subjectColor: "#7e22ce", notes: "معمل الفيزياء" },
+  { id: 3, dayOfWeek: 0, periodNumber: 3, subjectName: "الكيمياء", subjectColor: "#be123c", notes: "المختبر" },
+  { id: 4, dayOfWeek: 0, periodNumber: 4, subjectName: "اللغة العربية", subjectColor: "#d97706", notes: "القاعة 102" },
+  { id: 5, dayOfWeek: 0, periodNumber: 5, subjectName: "اللغة الإنجليزية", subjectColor: "#0284c7", notes: "معمل اللغات" },
+  { id: 6, dayOfWeek: 1, periodNumber: 1, subjectName: "الفيزياء", subjectColor: "#7e22ce", notes: "معمل الفيزياء" },
+  { id: 7, dayOfWeek: 1, periodNumber: 2, subjectName: "الرياضيات", subjectColor: "#1d4ed8", notes: "القاعة 101" },
+  { id: 8, dayOfWeek: 2, periodNumber: 1, subjectName: "الكيمياء", subjectColor: "#be123c", notes: "المختبر" },
+  { id: 9, dayOfWeek: 3, periodNumber: 1, subjectName: "اللغة العربية", subjectColor: "#d97706", notes: "القاعة 102" },
+  { id: 10, dayOfWeek: 4, periodNumber: 1, subjectName: "الرياضيات", subjectColor: "#1d4ed8", notes: "القاعة 101" },
 ];
 
 const defaultScheduleConfig = {

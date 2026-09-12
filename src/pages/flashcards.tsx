@@ -49,10 +49,28 @@ export default function FlashcardsPage() {
 
   // Combined cards list with strict deduplication
   const cards = useMemo(() => {
-    const list = Array.isArray(sharedCards) && sharedCards.length > 0 ? sharedCards : DEFAULT_FLASHCARDS;
-    // Filter out old filler cards fc-1 to fc-15 if present in legacy storage
-    const cleanList = list.filter(c => c && c.id && !/^fc-\d+$/.test(c.id));
-    const combined = [...personalCards, ...cleanList, ...DEFAULT_FLASHCARDS];
+    // 1. Standard official curriculum flashcards (41 cards)
+    const officialCards = [...DEFAULT_FLASHCARDS];
+    const officialWords = new Set(officialCards.map(c => c.word.trim().toLowerCase()));
+
+    // 2. Filter for genuine custom or teacher-created cards only
+    const isCustomCard = (c: any) =>
+      c && c.id && (
+        c.isCustom ||
+        c.isPersonal ||
+        String(c.id).startsWith("custom_") ||
+        String(c.id).startsWith("fc-admin-") ||
+        String(c.id).startsWith("fc-personal-") ||
+        String(c.id).startsWith("fc-ai-") ||
+        String(c.id).startsWith("fc-imported-")
+      );
+
+    const validPersonal = personalCards.filter(c => isCustomCard(c) && !officialWords.has(c.word?.trim().toLowerCase()));
+    const validSharedCustom = Array.isArray(sharedCards)
+      ? sharedCards.filter(c => isCustomCard(c) && !officialWords.has(c.word?.trim().toLowerCase()))
+      : [];
+
+    const combined = [...officialCards, ...validSharedCustom, ...validPersonal];
     
     // Strict deduplication by unique ID and trimmed lowercase word
     const seenIds = new Set<string>();
@@ -259,9 +277,10 @@ export default function FlashcardsPage() {
     } catch (err) {
       console.error("AI generation error:", err);
       // Fallback
+      const timestamp = Date.now();
       const fallback: EnhancedFlashcard[] = [
         {
-          id: `fc-ai-${Date.now()}-1`,
+          id: `fc-ai-${timestamp}-1`,
           word: "Pragmatic",
           phonetic: "/præɡˈmætɪk/",
           partOfSpeech: "adjective",
@@ -523,14 +542,14 @@ export default function FlashcardsPage() {
     return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="794" height="1123" viewBox="0 0 794 1123">
   <defs>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&amp;family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;display=swap');
+    <style type="text/css"><![CDATA[
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
       * { box-sizing: border-box; margin: 0; padding: 0; }
       div, p, span, h1, h2, h3 {
         font-family: 'IBM Plex Sans Arabic', 'Plus Jakarta Sans', Arial, sans-serif !important;
         line-height: 1.35;
       }
-    </style>
+    ]]></style>
   </defs>
   <foreignObject width="100%" height="100%" x="0" y="0">
     <div xmlns="http://www.w3.org/1999/xhtml" style="width:794px; height:1123px; font-family: 'IBM Plex Sans Arabic', 'Plus Jakarta Sans', Arial, sans-serif; background-color: #ffffff; border-radius: 0px; margin: 0; padding: 0;">

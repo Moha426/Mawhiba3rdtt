@@ -23,6 +23,7 @@ import {
   subscribeToStudyFiles,
   toggleStudyFileFavorite,
   getLibraryCategories,
+  deduplicateFiles,
   type StudyFile 
 } from "@/lib/cloud-sync";
 import { useToast } from "@/hooks/use-toast";
@@ -38,9 +39,8 @@ export default function LibraryPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    setLoading(true);
     const unsub = subscribeToStudyFiles((updatedFiles) => {
-      setFiles(updatedFiles);
+      setFiles(deduplicateFiles(updatedFiles));
       setLoading(false);
     });
     return () => unsub();
@@ -49,13 +49,13 @@ export default function LibraryPage() {
   const handleToggleFavorite = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const isFav = toggleStudyFileFavorite(id);
-    setFiles(prev => prev.map(f => f.id === id ? { ...f, isFavorite: isFav } : f));
+    setFiles(prev => deduplicateFiles(prev.map(f => f.id === id ? { ...f, isFavorite: isFav } : f)));
     toast({
       title: isFav ? "تمت الإضافة إلى المفضلة ⭐" : "تمت الإزالة من المفضلة",
     });
   };
 
-  const filteredFiles = files.filter(f => {
+  const filteredFiles = deduplicateFiles(files).filter(f => {
     if (onlyFavorites && !f.isFavorite) return false;
     const matchesCategory = selectedCategory === "الكل" || f.category === selectedCategory;
     const matchesSearch = 

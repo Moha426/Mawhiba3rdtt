@@ -19,6 +19,7 @@ import {
   deleteStudyFile,
   getLibraryCategories,
   saveLibraryCategories,
+  deduplicateFiles,
   type StudyFile
 } from "@/lib/cloud-sync";
 import { useToast } from "@/hooks/use-toast";
@@ -49,7 +50,7 @@ export function LibraryTab() {
   useEffect(() => {
     setLoading(true);
     const unsub = subscribeToStudyFiles((updated) => {
-      setFiles(updated);
+      setFiles(deduplicateFiles(updated));
       setLoading(false);
     });
     return () => unsub();
@@ -123,7 +124,7 @@ export function LibraryTab() {
       });
 
       if (updated) {
-        setFiles(prev => prev.map(f => f.id === editingFile.id ? { ...f, ...updated } : f));
+        setFiles(prev => deduplicateFiles(prev.map(f => f.id === editingFile.id ? { ...f, ...updated } : f)));
         toast({ title: "تم تحديث الملف بنجاح ✏️" });
       }
     } else {
@@ -137,7 +138,7 @@ export function LibraryTab() {
         tags: tagList.length > 0 ? tagList : [formCategory]
       });
 
-      setFiles(prev => [created, ...prev]);
+      setFiles(prev => deduplicateFiles([created, ...prev]));
       toast({ title: "تمت إضافة التجميعة إلى المكتبة 📚" });
     }
 
@@ -146,11 +147,11 @@ export function LibraryTab() {
 
   const handleDeleteFile = async (id: string) => {
     await deleteStudyFile(id);
-    setFiles(prev => prev.filter(f => String(f.id) !== String(id)));
+    setFiles(prev => deduplicateFiles(prev.filter(f => String(f.id) !== String(id))));
     toast({ title: "تم حذف الملف من المكتبة" });
   };
 
-  const filtered = files.filter(f => {
+  const filtered = deduplicateFiles(files).filter(f => {
     const matchCat = selectedCategory === "الكل" || f.category === selectedCategory;
     const q = search.toLowerCase().trim();
     const matchSearch =

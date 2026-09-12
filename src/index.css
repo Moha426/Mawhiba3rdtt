@@ -1,3 +1,85 @@
+/* ── GRAPHIK ARABIC FONT (خط جرافيك العربي بكافة الأوزان) ───────────────── */
+@font-face {
+  font-family: 'Graphik Arabic';
+  src: url('https://res.cloudinary.com/dgplafutp/raw/upload/v1776185740/GRAPHIK_ARABIC_THIN_e0fhvt.OTF') format('opentype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Graphik Arabic';
+  src: url('https://res.cloudinary.com/dgplafutp/raw/upload/v1776185741/GRAPHIK_ARABIC_EXTRALIGHT_unycd4.OTF') format('opentype');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Graphik Arabic';
+  src: url('https://res.cloudinary.com/dgplafutp/raw/upload/v1776185741/GRAPHIK_ARABIC_LIGHT_xpdtie.OTF') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Graphik Arabic';
+  src: url('https://res.cloudinary.com/dgplafutp/raw/upload/v1776185741/GRAPHIK_ARABIC_i1sh9c.OTF') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Graphik Arabic';
+  src: url('https://res.cloudinary.com/dgplafutp/raw/upload/v1776185741/GRAPHIK_ARABIC_MEDIUM_zlcirb.OTF') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Graphik Arabic';
+  src: url('https://res.cloudinary.com/dgplafutp/raw/upload/v1776185741/GRAPHIK_ARABIC_SEMIBOLD_tu68ql.OTF') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Graphik Arabic';
+  src: url('https://res.cloudinary.com/dgplafutp/raw/upload/v1776185740/GRAPHIK_ARABIC_BOLD_rpodpi.OTF') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Graphik Arabic';
+  src: url('https://res.cloudinary.com/dgplafutp/raw/upload/v1776185741/GRAPHIK_ARABIC_BLACK_a3gvnc.OTF') format('opentype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Specific named alias for ultra-bold/black usage */
+@font-face {
+  font-family: 'Graphik Arabic Black';
+  src: url('https://res.cloudinary.com/dgplafutp/raw/upload/v1776185741/GRAPHIK_ARABIC_BLACK_a3gvnc.OTF') format('opentype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Graphik Arabic Bold';
+  src: url('https://res.cloudinary.com/dgplafutp/raw/upload/v1776185740/GRAPHIK_ARABIC_BOLD_rpodpi.OTF') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ── THMANYAH FONT (خط ثمانية) ────────────────────────────────────────── */
 @font-face {
   font-family: 'Thmanyah';
@@ -637,6 +719,23 @@
   .animate-glow-pulse   { animation: glow-pulse 3s ease-in-out infinite; }
   .animate-gradient-x   { animation: gradient-x 6s ease infinite; background-size: 200% 200%; }
   .animate-shimmer-slide { animation: shimmer-slide 2s linear infinite; }
+
+  /* Graphik Arabic Font utilities for high-impact darker subject titles */
+  .font-graphik {
+    font-family: 'Graphik Arabic', 'Graphik', 'Thmanyah', sans-serif !important;
+  }
+  .font-graphik-black {
+    font-family: 'Graphik Arabic Black', 'Graphik Arabic', 'Graphik', 'Thmanyah', sans-serif !important;
+    font-weight: 900 !important;
+  }
+  .font-graphik-bold {
+    font-family: 'Graphik Arabic Bold', 'Graphik Arabic', 'Graphik', 'Thmanyah', sans-serif !important;
+    font-weight: 700 !important;
+  }
+  .font-graphik-medium {
+    font-family: 'Graphik Arabic', 'Graphik', 'Thmanyah', sans-serif !important;
+    font-weight: 500 !important;
+  }
 }
 
 @layer utilities {

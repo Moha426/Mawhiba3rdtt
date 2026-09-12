@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Camera, Check, AlertCircle, User, KeyRound, LogOut, BarChart3, Trophy, Target, Star, Plus, Trash2, Pin } from "lucide-react";
+import { Loader2, Camera, Check, AlertCircle, User, KeyRound, LogOut, BarChart3, Trophy, Target, Star, Plus, Trash2, Pin, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useCompletions } from "@/hooks/use-completions";
 import { isPast, parseISO, isToday } from "date-fns";

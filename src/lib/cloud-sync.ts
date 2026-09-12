@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { db, safeFirestoreWrite } from "./firebase";
+import { idbGet, idbSet, safeLocalStorageSet } from "./indexed-db";
 
 export interface StudyFile {
   id: string;
@@ -139,33 +140,63 @@ function recordDeletedFileId(id: string) {
 }
 
 /**
- * Save complete study files list to local cache and Firestore cloud storage
+ * Deduplicate any array of study files by id to guarantee unique keys and prevent duplicate renders
+ */
+export function deduplicateFiles(files: StudyFile[]): StudyFile[] {
+  if (!Array.isArray(files)) return [];
+  const seen = new Set<string>();
+  const result: StudyFile[] = [];
+  for (const f of files) {
+    if (!f || !f.id) continue;
+    const strId = String(f.id);
+    if (!seen.has(strId)) {
+      seen.add(strId);
+      result.push(f);
+    }
+  }
+  return result;
+}
+
+/**
+ * Save complete study files list to local cache (IndexedDB + safe localStorage) and Firestore cloud storage
  */
 export function saveStudyFiles(files: StudyFile[]) {
+  const cleanFiles = deduplicateFiles(files);
   try {
-    const jsonStr = JSON.stringify(files);
-    localStorage.setItem(LOCAL_STORAGE_FILES_KEY, jsonStr);
-    localStorage.setItem(LOCAL_STORAGE_APP_DATA_FILES_KEY, jsonStr);
-    window.dispatchEvent(new CustomEvent("app_file_updated", { detail: files }));
-    window.dispatchEvent(new CustomEvent("app_data_change", { detail: { key: "study_files", value: files } }));
+    // 1. Asynchronously store full fidelity in IndexedDB (bypasses 5MB quota)
+    idbSet("study_files", cleanFiles);
+
+    // 2. Safely store in localStorage with automatic quota management
+    safeLocalStorageSet(LOCAL_STORAGE_APP_DATA_FILES_KEY, cleanFiles);
+
+    window.dispatchEvent(new CustomEvent("app_file_updated", { detail: cleanFiles }));
+    window.dispatchEvent(new CustomEvent("app_data_change", { detail: { key: "study_files", value: cleanFiles } }));
   } catch (e) {
-    console.error("Error saving study files to localStorage:", e);
+    console.warn("Notice: Local study files write warning:", e);
   }
 
   // Cloud Firestore Sync
   safeFirestoreWrite(async () => {
     const docRef = doc(db, "app_data", "study_files");
-    await setDoc(docRef, { value: files, updatedAt: serverTimestamp() }, { merge: true });
+    await setDoc(docRef, { value: cleanFiles, updatedAt: serverTimestamp() }, { merge: true });
   });
 }
 
 /**
- * Fetch custom and curated files from Firestore + Cloud SQL + Local cache
+ * Fetch custom and curated files from IndexedDB + Firestore + Cloud SQL + Local cache
  */
 export async function getStudyFiles(): Promise<StudyFile[]> {
   const deletedIds = getDeletedFileIds();
   try {
-    // 1. Try local cache
+    // 1. Try IndexedDB first for full-fidelity payload (avoids quota issues)
+    try {
+      const idbData = await idbGet<StudyFile[]>("study_files");
+      if (idbData && Array.isArray(idbData) && idbData.length > 0) {
+        return deduplicateFiles(idbData.filter(f => f && f.id && !deletedIds.has(f.id)));
+      }
+    } catch {}
+
+    // 2. Try local cache
     const savedAppData = localStorage.getItem(LOCAL_STORAGE_APP_DATA_FILES_KEY);
     const savedLocal = localStorage.getItem(LOCAL_STORAGE_FILES_KEY);
     const saved = savedAppData || savedLocal;
@@ -175,66 +206,79 @@ export async function getStudyFiles(): Promise<StudyFile[]> {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          localList = parsed;
+          localList = deduplicateFiles(parsed);
         }
       } catch {}
     }
 
-    // 2. Try Firestore cloud
+    // 3. Try Firestore cloud
     try {
       const docRef = doc(db, "app_data", "study_files");
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const d = snap.data();
         if (d && Array.isArray(d.value)) {
-          saveStudyFiles(d.value);
-          return d.value.filter(f => f && f.id && !deletedIds.has(f.id));
+          const cloudFiles = deduplicateFiles(d.value.filter(f => f && f.id && !deletedIds.has(f.id)));
+          saveStudyFiles(cloudFiles);
+          return cloudFiles;
         }
       }
     } catch {}
 
     if (localList !== null) {
-      return localList.filter(f => f && f.id && !deletedIds.has(f.id));
+      return deduplicateFiles(localList.filter(f => f && f.id && !deletedIds.has(f.id)));
     }
 
-    // 3. Fallback to default curated list
-    return INITIAL_CURATED_FILES.filter(f => !deletedIds.has(f.id));
+    // 4. Fallback to default curated list
+    return deduplicateFiles(INITIAL_CURATED_FILES.filter(f => !deletedIds.has(f.id)));
   } catch (err) {
-    console.error("Error reading study files:", err);
-    return INITIAL_CURATED_FILES.filter(f => !deletedIds.has(f.id));
+    console.warn("Notice: Error reading study files, falling back to curated list:", err);
+    return deduplicateFiles(INITIAL_CURATED_FILES.filter(f => !deletedIds.has(f.id)));
   }
 }
 
 /**
- * Subscribe to study files in real time via Firestore
+ * Subscribe to study files in real time via Firestore and IndexedDB
  */
 export function subscribeToStudyFiles(onUpdate: (files: StudyFile[]) => void): () => void {
+  const safeUpdate = (list: StudyFile[]) => {
+    onUpdate(deduplicateFiles(list));
+  };
+
   // Emit initial local state immediately
   try {
     const deletedIds = getDeletedFileIds();
+    
+    // Quick async load from IndexedDB
+    idbGet<StudyFile[]>("study_files").then((idbFiles) => {
+      if (idbFiles && Array.isArray(idbFiles) && idbFiles.length > 0) {
+        safeUpdate(idbFiles.filter(f => f && f.id && !deletedIds.has(f.id)));
+      }
+    }).catch(() => {});
+
     const saved = localStorage.getItem(LOCAL_STORAGE_APP_DATA_FILES_KEY) || localStorage.getItem(LOCAL_STORAGE_FILES_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed)) {
-        onUpdate(parsed.filter(f => f && f.id && !deletedIds.has(f.id)));
+        safeUpdate(parsed.filter(f => f && f.id && !deletedIds.has(f.id)));
       } else {
-        onUpdate(INITIAL_CURATED_FILES.filter(f => !deletedIds.has(f.id)));
+        safeUpdate(INITIAL_CURATED_FILES.filter(f => !deletedIds.has(f.id)));
       }
     } else {
-      onUpdate(INITIAL_CURATED_FILES.filter(f => !deletedIds.has(f.id)));
+      safeUpdate(INITIAL_CURATED_FILES.filter(f => !deletedIds.has(f.id)));
     }
   } catch {
-    onUpdate(INITIAL_CURATED_FILES);
+    safeUpdate(INITIAL_CURATED_FILES);
   }
 
   // Local window events listener
   const handleLocalChange = (e: any) => {
     if (e.detail && Array.isArray(e.detail)) {
-      onUpdate(e.detail);
+      safeUpdate(e.detail);
     } else if (e.detail?.key === "study_files" && Array.isArray(e.detail.value)) {
-      onUpdate(e.detail.value);
+      safeUpdate(e.detail.value);
     } else {
-      getStudyFiles().then(onUpdate);
+      getStudyFiles().then(safeUpdate);
     }
   };
   window.addEventListener("app_file_updated", handleLocalChange);
@@ -250,12 +294,13 @@ export function subscribeToStudyFiles(onUpdate: (files: StudyFile[]) => void): (
         const data = snapshot.data();
         if (data && Array.isArray(data.value)) {
           const deletedIds = getDeletedFileIds();
-          const clean = data.value.filter(f => f && f.id && !deletedIds.has(f.id));
-          try {
-            localStorage.setItem(LOCAL_STORAGE_APP_DATA_FILES_KEY, JSON.stringify(clean));
-            localStorage.setItem(LOCAL_STORAGE_FILES_KEY, JSON.stringify(clean));
-          } catch {}
-          onUpdate(clean);
+          const clean = deduplicateFiles(data.value.filter(f => f && f.id && !deletedIds.has(f.id)));
+          
+          // Asynchronously update IndexedDB and safe localStorage
+          idbSet("study_files", clean);
+          safeLocalStorageSet(LOCAL_STORAGE_APP_DATA_FILES_KEY, clean);
+
+          safeUpdate(clean);
         }
       } else {
         // Seed if missing
@@ -422,9 +467,9 @@ export function getPlatformCategories(): string[] {
 
 export function savePlatformCategories(categories: string[]) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_PLATFORM_CATEGORIES_KEY, JSON.stringify(categories));
+    safeLocalStorageSet(LOCAL_STORAGE_PLATFORM_CATEGORIES_KEY, categories);
   } catch (e) {
-    console.error(e);
+    console.warn(e);
   }
 }
 
@@ -441,21 +486,20 @@ export function getStoredPlatforms(defaultList: any[] = []): any[] {
       }
     }
   } catch (e) {
-    console.error("Error reading platforms from storage:", e);
+    console.warn("Notice: reading platforms from storage:", e);
   }
   return defaultList;
 }
 
 export function saveStoredPlatforms(platforms: any[]) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_PLATFORMS_KEY, JSON.stringify(platforms));
-    localStorage.setItem("app_data_platforms", JSON.stringify(platforms));
-    localStorage.setItem("custom_educational_platforms_v3", JSON.stringify(platforms));
-    localStorage.setItem("custom_educational_platforms_v2", JSON.stringify(platforms));
+    idbSet("app_data_platforms", platforms);
+    safeLocalStorageSet(LOCAL_STORAGE_PLATFORMS_KEY, platforms);
+    safeLocalStorageSet("app_data_platforms", platforms);
     window.dispatchEvent(new CustomEvent("platforms_storage_change", { detail: { platforms } }));
     window.dispatchEvent(new CustomEvent("app_data_change", { detail: { key: "platforms", value: platforms } }));
   } catch (e) {
-    console.error("Error saving platforms to storage:", e);
+    console.warn("Notice: saving platforms to storage:", e);
   }
   safeFirestoreWrite(async () => {
     const docRef = doc(db, "app_data", "platforms");
@@ -481,7 +525,7 @@ export function recordDeletedFlashcardId(id: string) {
     const current = Array.from(getDeletedFlashcardIds());
     if (!current.includes(id)) {
       current.push(id);
-      localStorage.setItem(LOCAL_STORAGE_DELETED_FLASHCARDS_KEY, JSON.stringify(current));
+      safeLocalStorageSet(LOCAL_STORAGE_DELETED_FLASHCARDS_KEY, current);
     }
   } catch {}
 }
@@ -491,6 +535,16 @@ export function recordDeletedFlashcardId(id: string) {
  */
 export function getStoredFlashcards(defaultList: any[] = []): any[] {
   const deletedIds = getDeletedFlashcardIds();
+  const isCustomCard = (c: any) =>
+    c && c.id && (
+      c.isCustom ||
+      c.isPersonal ||
+      String(c.id).startsWith("custom_") ||
+      String(c.id).startsWith("fc-admin-") ||
+      String(c.id).startsWith("fc-personal-") ||
+      String(c.id).startsWith("fc-ai-") ||
+      String(c.id).startsWith("fc-imported-")
+    );
   try {
     const savedAppData = localStorage.getItem("app_data_flashcards");
     const savedLegacy = localStorage.getItem(LOCAL_STORAGE_FLASHCARDS_KEY);
@@ -498,15 +552,14 @@ export function getStoredFlashcards(defaultList: any[] = []): any[] {
     if (saved !== null && saved !== undefined) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const storedClean = parsed.filter((c: any) => c && c.id && !deletedIds.has(c.id));
-        // Merge any new default cards that aren't deleted
-        const existingIds = new Set(storedClean.map((c: any) => c.id));
-        const missingDefaults = defaultList.filter((c: any) => c && c.id && !deletedIds.has(c.id) && !existingIds.has(c.id));
-        return [...storedClean, ...missingDefaults];
+        const defaultWords = new Set(defaultList.map((d: any) => d?.word?.trim()?.toLowerCase()));
+        const customClean = parsed.filter((c: any) => isCustomCard(c) && !deletedIds.has(c.id) && !defaultWords.has(c?.word?.trim()?.toLowerCase()));
+        const cleanDefaults = defaultList.filter((c: any) => c && c.id && !deletedIds.has(c.id));
+        return [...cleanDefaults, ...customClean];
       }
     }
   } catch (e) {
-    console.error("Error reading flashcards from storage:", e);
+    console.warn("Notice: reading flashcards from storage:", e);
   }
   return defaultList.filter((c: any) => c && c.id && !deletedIds.has(c.id));
 }
@@ -515,12 +568,13 @@ export function saveStoredFlashcards(flashcards: any[]) {
   const deletedIds = getDeletedFlashcardIds();
   const cleanList = Array.isArray(flashcards) ? flashcards.filter(c => c && c.id && !deletedIds.has(c.id)) : [];
   try {
-    localStorage.setItem(LOCAL_STORAGE_FLASHCARDS_KEY, JSON.stringify(cleanList));
-    localStorage.setItem("app_data_flashcards", JSON.stringify(cleanList));
+    idbSet("app_data_flashcards", cleanList);
+    safeLocalStorageSet(LOCAL_STORAGE_FLASHCARDS_KEY, cleanList);
+    safeLocalStorageSet("app_data_flashcards", cleanList);
     window.dispatchEvent(new CustomEvent("flashcards_storage_change", { detail: { flashcards: cleanList } }));
     window.dispatchEvent(new CustomEvent("app_data_change", { detail: { key: "flashcards", value: cleanList } }));
   } catch (e) {
-    console.error("Error saving flashcards to storage:", e);
+    console.warn("Notice: saving flashcards to storage:", e);
   }
 
   // Cloud Firestore persistence
@@ -563,7 +617,7 @@ export function saveCustomReminder(params: {
   const current = getCustomReminders();
   const updated = [newReminder, ...current];
   try {
-    localStorage.setItem(LOCAL_STORAGE_REMINDERS_KEY, JSON.stringify(updated));
+    safeLocalStorageSet(LOCAL_STORAGE_REMINDERS_KEY, updated);
   } catch {}
   return newReminder;
 }
@@ -572,7 +626,7 @@ export function toggleReminderStatus(id: string): CustomReminder[] {
   const current = getCustomReminders();
   const updated = current.map(r => r.id === id ? { ...r, completed: !r.completed } : r);
   try {
-    localStorage.setItem(LOCAL_STORAGE_REMINDERS_KEY, JSON.stringify(updated));
+    safeLocalStorageSet(LOCAL_STORAGE_REMINDERS_KEY, updated);
   } catch {}
   return updated;
 }
@@ -581,7 +635,7 @@ export function deleteReminder(id: string): CustomReminder[] {
   const current = getCustomReminders();
   const updated = current.filter(r => r.id !== id);
   try {
-    localStorage.setItem(LOCAL_STORAGE_REMINDERS_KEY, JSON.stringify(updated));
+    safeLocalStorageSet(LOCAL_STORAGE_REMINDERS_KEY, updated);
   } catch {}
   return updated;
 }
@@ -591,22 +645,25 @@ if (typeof window !== "undefined") {
   window.addEventListener("app_data_change", (e: any) => {
     if (e.detail?.key === "platforms" && Array.isArray(e.detail.value)) {
       try {
-        localStorage.setItem(LOCAL_STORAGE_PLATFORMS_KEY, JSON.stringify(e.detail.value));
-        localStorage.setItem("app_data_platforms", JSON.stringify(e.detail.value));
+        idbSet("app_data_platforms", e.detail.value);
+        safeLocalStorageSet(LOCAL_STORAGE_PLATFORMS_KEY, e.detail.value);
+        safeLocalStorageSet("app_data_platforms", e.detail.value);
         window.dispatchEvent(new CustomEvent("platforms_storage_change", { detail: { platforms: e.detail.value } }));
       } catch {}
     }
     if (e.detail?.key === "flashcards" && Array.isArray(e.detail.value)) {
       try {
-        localStorage.setItem(LOCAL_STORAGE_FLASHCARDS_KEY, JSON.stringify(e.detail.value));
-        localStorage.setItem("app_data_flashcards", JSON.stringify(e.detail.value));
+        idbSet("app_data_flashcards", e.detail.value);
+        safeLocalStorageSet(LOCAL_STORAGE_FLASHCARDS_KEY, e.detail.value);
+        safeLocalStorageSet("app_data_flashcards", e.detail.value);
         window.dispatchEvent(new CustomEvent("flashcards_storage_change", { detail: { flashcards: e.detail.value } }));
       } catch {}
     }
     if (e.detail?.key === "study_files" && Array.isArray(e.detail.value)) {
       try {
-        localStorage.setItem(LOCAL_STORAGE_FILES_KEY, JSON.stringify(e.detail.value));
-        localStorage.setItem(LOCAL_STORAGE_APP_DATA_FILES_KEY, JSON.stringify(e.detail.value));
+        idbSet("study_files", e.detail.value);
+        safeLocalStorageSet(LOCAL_STORAGE_FILES_KEY, e.detail.value);
+        safeLocalStorageSet(LOCAL_STORAGE_APP_DATA_FILES_KEY, e.detail.value);
         window.dispatchEvent(new CustomEvent("app_file_updated", { detail: e.detail.value }));
       } catch {}
     }

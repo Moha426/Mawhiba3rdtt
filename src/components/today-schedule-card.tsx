@@ -3,6 +3,7 @@ import { useListSchedule, useGetScheduleConfig } from "@workspace/api-client-rea
 import { GraduationCap, Coffee, Sparkles, CheckCircle2, Clock, CalendarClock } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { formatTime12h, getSubjectDecoration } from "@/lib/schedule-utils";
 
 function useLiveMins() {
   const [nowMinsLive, setNowMinsLive] = useState(() => {
@@ -226,7 +227,7 @@ export function TodayScheduleCard() {
         <div className="px-4 py-2 text-[11px] text-muted-foreground border-t border-border/30 text-center">
           <span className="inline-flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5 shrink-0" />
-            {`تبدأ الدراسة الساعة ${periodTimes[0]?.start}`}
+            {`تبدأ الدراسة الساعة ${formatTime12h(periodTimes[0]?.start)}`}
             {periodTimes[0] && (() => {
               const startMins = timeToMins(periodTimes[0].start);
               const diff = startMins - nowMins;
@@ -296,48 +297,66 @@ function PeriodsGrid({ slots, PERIODS, periodTimes, breakAfterPeriod, activePeri
           const isActive = activePeriodIdx === idx;
           const isPast = !allDone && periodTimes[idx] && nowMins >= timeToMins(periodTimes[idx].end);
           const isBreakAfter = period === breakAfterPeriod;
+          const deco = slot ? getSubjectDecoration(slot.subjectName, slot.subjectColor) : null;
+          const DecoIcon = deco?.icon;
 
           return (
             <div key={period} className="flex">
               <div
-                className={`relative flex flex-col items-center justify-between p-2.5 w-[88px] border-l last:border-0 border-border/20 transition-colors ${
+                className={`relative flex flex-col items-center justify-between p-2.5 w-[96px] border-l last:border-0 border-border/20 transition-colors ${
                   isActive
                     ? "bg-primary/8"
                     : isPast
-                    ? "opacity-45"
+                    ? "opacity-50"
                     : ""
                 }`}
               >
                 {isActive && (
                   <div className="absolute top-0 inset-x-0 h-0.5 bg-primary rounded-b" />
                 )}
-                <div className="flex flex-col items-center gap-1 w-full">
+                <div className="flex flex-col items-center gap-0.5 w-full text-center" dir="rtl">
                   <span
-                    className={`text-[10px] font-bold ${
+                    className={`text-[10.5px] font-extrabold ${
                       isActive ? "text-primary" : "text-muted-foreground"
                     }`}
                   >
                     {PERIOD_LABEL[idx] ?? `ح${period}`}
                   </span>
-                  <span className="text-[9px] text-muted-foreground/70 font-mono" dir="ltr">
-                    {periodTimes[idx]?.start}
-                  </span>
+                  <div className="flex flex-col items-center leading-tight text-[8.5px] font-bold text-muted-foreground/90">
+                    <span className="text-foreground/80 font-black">من {formatTime12h(periodTimes[idx]?.start)}</span>
+                    <span className="text-muted-foreground/70">إلى {formatTime12h(periodTimes[idx]?.end)}</span>
+                  </div>
                 </div>
 
                 <div className="w-full mt-1.5">
-                  {slot ? (
-                    <div
-                      className="rounded-lg px-1.5 py-1.5 text-center text-[10px] font-bold leading-tight border"
-                      style={{
-                        backgroundColor: `${slot.subjectColor}18`,
-                        color: slot.subjectColor,
-                        borderColor: `${slot.subjectColor}40`,
-                      }}
-                    >
-                      {slot.subjectName}
-                    </div>
-                  ) : (
-                    <div className="rounded-lg px-1.5 py-1.5 text-center text-[10px] text-muted-foreground/40 border border-dashed border-muted-foreground/20">
+                  {slot && deco && DecoIcon ? (() => {
+                    const cardColor = slot.subjectColor || deco.baseColor;
+                    return (
+                      <div
+                        className="rounded-xl px-2 py-2 text-center text-[10px] font-bold leading-tight border shadow-2xs flex flex-col items-center justify-center transition-transform hover:scale-[1.02] relative overflow-hidden min-h-[58px]"
+                        style={{
+                          backgroundColor: `${cardColor}0d`,
+                          borderColor: `${cardColor}30`,
+                        }}
+                      >
+                        {/* Background Watermark Icon */}
+                        <DecoIcon
+                          className="absolute -bottom-1 -left-1 w-8 h-8 pointer-events-none opacity-15"
+                          style={{ color: cardColor }}
+                        />
+
+                        <div className="flex-1 flex items-center justify-center w-full px-0.5 relative z-10">
+                          <span
+                            className="font-graphik-black line-clamp-2 text-foreground font-black text-[11px] text-center leading-tight tracking-tight"
+                            style={{ fontFamily: "'Graphik Arabic Black', 'Graphik Arabic', 'Thmanyah', sans-serif", fontWeight: 900 }}
+                          >
+                            {slot.subjectName}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })() : (
+                    <div className="rounded-xl px-1.5 py-1.5 text-center text-[10px] text-muted-foreground/40 border border-dashed border-muted-foreground/20">
                       فارغة
                     </div>
                   )}
@@ -345,10 +364,10 @@ function PeriodsGrid({ slots, PERIODS, periodTimes, breakAfterPeriod, activePeri
               </div>
 
               {isBreakAfter && (
-                <div className="flex flex-col items-center justify-center w-10 bg-amber-50/60 dark:bg-amber-900/15 border-l border-amber-200/50 dark:border-amber-800/40">
-                  <Coffee className="h-3 w-3 text-amber-500 mb-0.5" />
-                  <span className="text-[8px] text-amber-500 font-semibold" style={{ writingMode: "vertical-rl" }}>
-                    استراحة
+                <div className="flex flex-col items-center justify-center w-12 bg-amber-500/10 dark:bg-amber-900/20 border-l border-amber-300/40 dark:border-amber-800/40 p-1 overflow-visible">
+                  <Coffee className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 mb-0.5 shrink-0" />
+                  <span className="text-[8.5px] text-amber-700 dark:text-amber-300 font-bold">
+                    فسحة
                   </span>
                 </div>
               )}

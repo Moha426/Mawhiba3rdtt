@@ -17,10 +17,20 @@ import { LoadingSpinner } from "@/components/loading-state";
 import { Badge } from "@/components/ui/badge";
 
 const SUBJECT_COLORS = [
-  "#3b82f6", "#8b5cf6", "#10b981", "#f97316", "#ef4444",
-  "#06b6d4", "#a855f7", "#22c55e", "#f59e0b", "#ec4899",
-  "#14b8a6", "#6366f1", "#e11d48", "#0ea5e9", "#d97706",
-  "#7c3aed", "#16a34a", "#dc2626", "#2563eb", "#059669",
+  "#2563eb", // أزرق هادئ (Slate Blue)
+  "#5b21b6", // بنفسجي رصين (Deep Violet)
+  "#991b1b", // قرمزي دافئ (Warm Crimson)
+  "#166534", // أخضر صنوبري هادئ (Forest Pine)
+  "#b45309", // عنبري ذهبي (Golden Amber)
+  "#0284c7", // سماوي بحري (Maritime Blue)
+  "#0f766e", // تيل فارسي (Persian Teal)
+  "#9a3412", // فخاري أرضي (Warm Terracotta)
+  "#3730a3", // نيلي تقني هادئ (Tech Slate Indigo)
+  "#3f6212", // زيتوني وقور (Deep Olive)
+  "#701a75", // برقوقي غامق (Muted Plum - غير وردي)
+  "#334155", // فحمي هادئ (Slate Charcoal - كتابة وتعبير)
+  "#0e7490", // تيل علمي (Scientific Teal - بحوث علمية)
+  "#78350f", // حجري أرضي (Mineral Stone - جيولوجيا)
 ];
 
 function randomSubjectColor() {

@@ -19,12 +19,13 @@ import { getStoredFlashcards, saveStoredFlashcards, deleteStoredFlashcard } from
 import { usePersistentState } from "@/lib/api-client-react";
 
 const PRESET_CATEGORIES = [
-  "Unit 1: Two Is Better Than One",
+  "الأسماء (Nouns)",
+  "الأفعال (Verbs)",
+  "الصفات (Adjectives)",
+  "التفاوض (Negotiating)",
+  "كلام واقعي (Real Talk)",
   "أكاديمي وSTEP",
   "مفردات الموهبة",
-  "مفردات العلوم",
-  "كلمات متكررة",
-  "مصطلحات اليومية",
   "عام"
 ];
 
@@ -55,12 +56,23 @@ export function FlashcardsTab() {
   const [formMeaningAr, setFormMeaningAr] = useState("");
   const [formExampleEn, setFormExampleEn] = useState("");
   const [formExampleAr, setFormExampleAr] = useState("");
-  const [formCategory, setFormCategory] = useState("أكاديمي وSTEP");
+  const [formCategory, setFormCategory] = useState("الأسماء (Nouns)");
   const [formDifficulty, setFormDifficulty] = useState<"سهل" | "متوسط" | "متقدم">("متوسط");
 
-  // Clean cards list without legacy fc-1..fc-15 filler cards
+  // Clean cards list: official curriculum cards (41) + genuine custom/admin cards only
   const cleanCards = useMemo(() => {
-    return cards.filter(c => c && c.id && !/^fc-\d+$/.test(c.id));
+    const defaultIds = new Set(DEFAULT_FLASHCARDS.map(d => d.id));
+    const isCustomCard = (c: any) =>
+      c && c.id && (
+        c.isCustom ||
+        c.isPersonal ||
+        String(c.id).startsWith("custom_") ||
+        String(c.id).startsWith("fc-admin-") ||
+        String(c.id).startsWith("fc-personal-") ||
+        String(c.id).startsWith("fc-ai-") ||
+        String(c.id).startsWith("fc-imported-")
+      );
+    return cards.filter(c => c && c.id && (defaultIds.has(c.id) || isCustomCard(c)));
   }, [cards]);
 
   // Get categories list
@@ -183,11 +195,11 @@ export function FlashcardsTab() {
   };
 
   const handleResetToDefaults = () => {
-    const existingIds = new Set(cards.map(c => c.id));
-    const missingDefaults = DEFAULT_FLASHCARDS.filter(c => !existingIds.has(c.id));
-    const merged = [...cards, ...missingDefaults];
+    // Preserve custom cards created by the user or imported, replace defaults with official curriculum
+    const customCards = cards.filter(c => c && c.id && (c.isCustom || String(c.id).startsWith("custom_") || String(c.id).startsWith("fc-imported-")));
+    const merged = [...DEFAULT_FLASHCARDS, ...customCards.filter(c => !DEFAULT_FLASHCARDS.some(d => d.id === c.id))];
     updateCardsList(merged);
-    toast({ title: "تم الاسترجاع 🔄", description: "تمت إضافة كافة الكلمات الافتراضية لبطاقات الإنجليزية." });
+    toast({ title: "تم الاسترجاع والتحديث 🔄", description: "تم تحديث كافة كلمات بطاقات الإنجليزية وفق المنهج المعتمد (41 كلمة وعبارة)." });
   };
 
   const handleExportJSON = () => {
