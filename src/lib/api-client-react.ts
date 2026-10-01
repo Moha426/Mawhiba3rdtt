@@ -36,6 +36,18 @@ export function usePersistentState<T>(key: string, initialValue: T): [T, (val: T
     try {
       if (key === "flashcards") {
         const item = localStorage.getItem(`app_data_${key}`) || localStorage.getItem("talented_english_flashcards_v1");
+        const rawDelIds = localStorage.getItem("talented_english_deleted_ids_v1");
+        const rawDelWords = localStorage.getItem("talented_english_deleted_words_v1");
+        const deletedIds = new Set(rawDelIds ? JSON.parse(rawDelIds) : []);
+        const deletedWords = new Set(rawDelWords ? JSON.parse(rawDelWords).map((w: string) => String(w).trim().toLowerCase()) : []);
+
+        const isNotDeleted = (c: any) => {
+          if (!c || !c.id) return false;
+          if (deletedIds.has(String(c.id))) return false;
+          if (c.word && deletedWords.has(String(c.word).trim().toLowerCase())) return false;
+          return true;
+        };
+
         if (item) {
           const parsed = JSON.parse(item);
           if (Array.isArray(parsed) && Array.isArray(initialValue)) {
@@ -50,11 +62,12 @@ export function usePersistentState<T>(key: string, initialValue: T): [T, (val: T
                 String(c.id).startsWith("fc-ai-") ||
                 String(c.id).startsWith("fc-imported-")
               );
-            const customCards = parsed.filter((c: any) => isCustomCard(c) && !defaultWords.has(c?.word?.trim()?.toLowerCase()));
-            return [...(initialValue as any[]), ...customCards] as unknown as T;
+            const customCards = parsed.filter((c: any) => isCustomCard(c) && isNotDeleted(c) && !defaultWords.has(c?.word?.trim()?.toLowerCase()));
+            const cleanDefaults = (initialValue as any[]).filter(isNotDeleted);
+            return [...cleanDefaults, ...customCards] as unknown as T;
           }
         }
-        return initialValue;
+        return (Array.isArray(initialValue) ? initialValue.filter(isNotDeleted) : initialValue) as unknown as T;
       }
 
       const item = localStorage.getItem(`app_data_${key}`);
@@ -92,9 +105,23 @@ export function usePersistentState<T>(key: string, initialValue: T): [T, (val: T
 
               // Automatic healing and curriculum sync for flashcards
               if (key === "flashcards" && Array.isArray(initialValue)) {
+                const rawDelIds = localStorage.getItem("talented_english_deleted_ids_v1");
+                const rawDelWords = localStorage.getItem("talented_english_deleted_words_v1");
+                const deletedIds = new Set(rawDelIds ? JSON.parse(rawDelIds) : []);
+                const deletedWords = new Set(rawDelWords ? JSON.parse(rawDelWords).map((w: string) => String(w).trim().toLowerCase()) : []);
+
+                const isNotDeleted = (c: any) => {
+                  if (!c || !c.id) return false;
+                  if (deletedIds.has(String(c.id))) return false;
+                  if (c.word && deletedWords.has(String(c.word).trim().toLowerCase())) return false;
+                  // Obsolete negotiation expressions or legacy filler IDs
+                  if (String(c.id).startsWith("fc-expr-neg-")) return false;
+                  if (/^fc-\d+$/.test(String(c.id)) || /^fc-u1-\d+$/.test(String(c.id))) return false;
+                  return true;
+                };
+
                 if (Array.isArray(val)) {
                   const defaultWords = new Set((initialValue as any[]).map(c => c?.word?.trim()?.toLowerCase()));
-                  const defaultIds = new Set((initialValue as any[]).map(c => c?.id));
                   const isCustomCard = (c: any) =>
                     c && c.id && (
                       c.isCustom ||
@@ -105,21 +132,21 @@ export function usePersistentState<T>(key: string, initialValue: T): [T, (val: T
                       String(c.id).startsWith("fc-ai-") ||
                       String(c.id).startsWith("fc-imported-")
                     );
-                  const customCards = val.filter((c: any) => isCustomCard(c) && !defaultWords.has(c.word?.trim()?.toLowerCase()));
-                  const cleanDefaults = (initialValue as any[]);
-                  const finalCards = [...cleanDefaults, ...customCards.filter((c: any) => !cleanDefaults.some(d => d.id === c.id))];
 
-                  // Check if stored value had legacy/obsolete cards or missing standard cards
-                  const hadObsolete = val.some((c: any) => c?.id && !defaultIds.has(c.id) && !customCards.some(custom => custom.id === c.id));
-                  const isMissingDefaults = cleanDefaults.some(d => !val.some((c: any) => c?.id === d.id));
-                  
-                  if (hadObsolete || isMissingDefaults || val.length === 0) {
-                    val = finalCards;
-                    queueDebouncedFirestoreWrite(key, val);
-                  }
+                  const customCards = val.filter((c: any) => isCustomCard(c) && isNotDeleted(c) && !defaultWords.has(c.word?.trim()?.toLowerCase()));
+                  const currentDefaults = (initialValue as any[]).filter(isNotDeleted);
+
+                  // Keep cards from val that are in currentDefaults and not deleted
+                  const valDefaultIds = new Set(val.filter(isNotDeleted).map(c => c.id));
+                  const retainedDefaults = currentDefaults.filter(d => valDefaultIds.has(d.id));
+
+                  // If val has no defaults at all (first load) or if empty, use currentDefaults
+                  const finalDefaults = retainedDefaults.length > 0 ? retainedDefaults : currentDefaults;
+                  const finalCards = [...finalDefaults, ...customCards.filter((c: any) => !finalDefaults.some(d => d.id === c.id))];
+
+                  val = finalCards.filter(isNotDeleted);
                 } else {
-                  val = initialValue;
-                  queueDebouncedFirestoreWrite(key, val);
+                  val = (initialValue as any[]).filter(isNotDeleted);
                 }
               }
 

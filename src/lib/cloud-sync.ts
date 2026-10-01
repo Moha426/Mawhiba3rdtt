@@ -510,6 +510,7 @@ export function saveStoredPlatforms(platforms: any[]) {
 // Flashcards Storage & Persistence - Bug-Free Deletion & Empty Handling
 export const LOCAL_STORAGE_FLASHCARDS_KEY = "talented_english_flashcards_v1";
 export const LOCAL_STORAGE_DELETED_FLASHCARDS_KEY = "talented_english_deleted_ids_v1";
+export const LOCAL_STORAGE_DELETED_WORDS_KEY = "talented_english_deleted_words_v1";
 
 export function getDeletedFlashcardIds(): Set<string> {
   try {
@@ -520,21 +521,40 @@ export function getDeletedFlashcardIds(): Set<string> {
   }
 }
 
-export function recordDeletedFlashcardId(id: string) {
+export function getDeletedFlashcardWords(): Set<string> {
   try {
-    const current = Array.from(getDeletedFlashcardIds());
-    if (!current.includes(id)) {
-      current.push(id);
-      safeLocalStorageSet(LOCAL_STORAGE_DELETED_FLASHCARDS_KEY, current);
+    const raw = localStorage.getItem(LOCAL_STORAGE_DELETED_WORDS_KEY);
+    return new Set(raw ? JSON.parse(raw).map((w: string) => String(w).trim().toLowerCase()) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function recordDeletedFlashcardId(id: string, word?: string) {
+  try {
+    const currentIds = Array.from(getDeletedFlashcardIds());
+    if (id && !currentIds.includes(id)) {
+      currentIds.push(id);
+      safeLocalStorageSet(LOCAL_STORAGE_DELETED_FLASHCARDS_KEY, currentIds);
+    }
+    if (word && typeof word === "string" && word.trim()) {
+      const currentWords = Array.from(getDeletedFlashcardWords());
+      const normWord = word.trim().toLowerCase();
+      if (!currentWords.includes(normWord)) {
+        currentWords.push(normWord);
+        safeLocalStorageSet(LOCAL_STORAGE_DELETED_WORDS_KEY, currentWords);
+      }
     }
   } catch {}
 }
 
 /**
- * Returns stored flashcards without reviving deleted default cards when empty.
+ * Returns stored flashcards without reviving deleted cards.
  */
 export function getStoredFlashcards(defaultList: any[] = []): any[] {
   const deletedIds = getDeletedFlashcardIds();
+  const deletedWords = getDeletedFlashcardWords();
+
   const isCustomCard = (c: any) =>
     c && c.id && (
       c.isCustom ||
@@ -545,6 +565,14 @@ export function getStoredFlashcards(defaultList: any[] = []): any[] {
       String(c.id).startsWith("fc-ai-") ||
       String(c.id).startsWith("fc-imported-")
     );
+
+  const isNotDeleted = (c: any) => {
+    if (!c || !c.id) return false;
+    if (deletedIds.has(String(c.id))) return false;
+    if (c.word && deletedWords.has(String(c.word).trim().toLowerCase())) return false;
+    return true;
+  };
+
   try {
     const savedAppData = localStorage.getItem("app_data_flashcards");
     const savedLegacy = localStorage.getItem(LOCAL_STORAGE_FLASHCARDS_KEY);
@@ -553,20 +581,30 @@ export function getStoredFlashcards(defaultList: any[] = []): any[] {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
         const defaultWords = new Set(defaultList.map((d: any) => d?.word?.trim()?.toLowerCase()));
-        const customClean = parsed.filter((c: any) => isCustomCard(c) && !deletedIds.has(c.id) && !defaultWords.has(c?.word?.trim()?.toLowerCase()));
-        const cleanDefaults = defaultList.filter((c: any) => c && c.id && !deletedIds.has(c.id));
+        const customClean = parsed.filter((c: any) => isCustomCard(c) && isNotDeleted(c) && !defaultWords.has(c?.word?.trim()?.toLowerCase()));
+        const cleanDefaults = defaultList.filter((c: any) => isNotDeleted(c));
         return [...cleanDefaults, ...customClean];
       }
     }
   } catch (e) {
     console.warn("Notice: reading flashcards from storage:", e);
   }
-  return defaultList.filter((c: any) => c && c.id && !deletedIds.has(c.id));
+  return defaultList.filter((c: any) => isNotDeleted(c));
 }
 
 export function saveStoredFlashcards(flashcards: any[]) {
   const deletedIds = getDeletedFlashcardIds();
-  const cleanList = Array.isArray(flashcards) ? flashcards.filter(c => c && c.id && !deletedIds.has(c.id)) : [];
+  const deletedWords = getDeletedFlashcardWords();
+
+  const cleanList = Array.isArray(flashcards)
+    ? flashcards.filter(c => {
+        if (!c || !c.id) return false;
+        if (deletedIds.has(String(c.id))) return false;
+        if (c.word && deletedWords.has(String(c.word).trim().toLowerCase())) return false;
+        return true;
+      })
+    : [];
+
   try {
     idbSet("app_data_flashcards", cleanList);
     safeLocalStorageSet(LOCAL_STORAGE_FLASHCARDS_KEY, cleanList);
@@ -584,10 +622,14 @@ export function saveStoredFlashcards(flashcards: any[]) {
   });
 }
 
-export function deleteStoredFlashcard(id: string, fallbackList: any[] = []) {
-  recordDeletedFlashcardId(id);
+export function deleteStoredFlashcard(id: string, word?: string, fallbackList: any[] = []) {
+  recordDeletedFlashcardId(id, word);
   const current = getStoredFlashcards(fallbackList);
-  const updated = current.filter(c => c.id !== id);
+  const updated = current.filter(c => {
+    if (String(c.id) === String(id)) return false;
+    if (word && String(c.word).trim().toLowerCase() === String(word).trim().toLowerCase()) return false;
+    return true;
+  });
   saveStoredFlashcards(updated);
 }
 

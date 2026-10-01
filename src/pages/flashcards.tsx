@@ -9,7 +9,7 @@ import {
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { DEFAULT_FLASHCARDS, type Flashcard } from "@/data/flashcards-data";
-import { getStoredFlashcards, saveStoredFlashcards, deleteStoredFlashcard } from "@/lib/cloud-sync";
+import { getStoredFlashcards, saveStoredFlashcards, deleteStoredFlashcard, getDeletedFlashcardIds, getDeletedFlashcardWords } from "@/lib/cloud-sync";
 import { useStudentProfile } from "@/lib/use-student-profile";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -47,10 +47,32 @@ export default function FlashcardsPage() {
     }
   });
 
-  // Combined cards list with strict deduplication
+  const [deleteVersion, setDeleteVersion] = useState(0);
+
+  useEffect(() => {
+    const onStorageChange = () => setDeleteVersion(v => v + 1);
+    window.addEventListener("flashcards_storage_change", onStorageChange);
+    window.addEventListener("app_data_change", onStorageChange);
+    return () => {
+      window.removeEventListener("flashcards_storage_change", onStorageChange);
+      window.removeEventListener("app_data_change", onStorageChange);
+    };
+  }, []);
+
+  // Combined cards list with strict deduplication & deletion filtering
   const cards = useMemo(() => {
-    // 1. Standard official curriculum flashcards (41 cards)
-    const officialCards = [...DEFAULT_FLASHCARDS];
+    const deletedIds = getDeletedFlashcardIds();
+    const deletedWords = getDeletedFlashcardWords();
+
+    const isNotDeleted = (c: any) => {
+      if (!c || !c.id) return false;
+      if (deletedIds.has(String(c.id))) return false;
+      if (c.word && deletedWords.has(String(c.word).trim().toLowerCase())) return false;
+      return true;
+    };
+
+    // 1. Standard official curriculum flashcards without deleted ones
+    const officialCards = DEFAULT_FLASHCARDS.filter(isNotDeleted);
     const officialWords = new Set(officialCards.map(c => c.word.trim().toLowerCase()));
 
     // 2. Filter for genuine custom or teacher-created cards only
@@ -65,9 +87,9 @@ export default function FlashcardsPage() {
         String(c.id).startsWith("fc-imported-")
       );
 
-    const validPersonal = personalCards.filter(c => isCustomCard(c) && !officialWords.has(c.word?.trim().toLowerCase()));
+    const validPersonal = personalCards.filter(c => isCustomCard(c) && isNotDeleted(c) && !officialWords.has(c.word?.trim().toLowerCase()));
     const validSharedCustom = Array.isArray(sharedCards)
-      ? sharedCards.filter(c => isCustomCard(c) && !officialWords.has(c.word?.trim().toLowerCase()))
+      ? sharedCards.filter(c => isCustomCard(c) && isNotDeleted(c) && !officialWords.has(c.word?.trim().toLowerCase()))
       : [];
 
     const combined = [...officialCards, ...validSharedCustom, ...validPersonal];
@@ -79,6 +101,7 @@ export default function FlashcardsPage() {
 
     for (const c of combined) {
       if (!c || !c.word || typeof c.word !== "string") continue;
+      if (!isNotDeleted(c)) continue;
       const normalizedWord = c.word.trim().toLowerCase();
       const cardId = c.id || `fc-${normalizedWord}`;
       if (!seenIds.has(cardId) && !seenWords.has(normalizedWord)) {
@@ -88,7 +111,7 @@ export default function FlashcardsPage() {
       }
     }
     return uniqueCards;
-  }, [personalCards, sharedCards]);
+  }, [personalCards, sharedCards, deleteVersion]);
 
   const [masteredIds, setMasteredIds] = useState<string[]>(() => {
     try {
@@ -160,8 +183,9 @@ export default function FlashcardsPage() {
         const q = searchQuery.toLowerCase().trim();
         const matchesWord = card.word.toLowerCase().includes(q);
         const matchesMeaning = card.meaningAr.includes(q);
+        const matchesDefinition = card.definitionEn?.toLowerCase().includes(q) || false;
         const matchesCategory = card.category.toLowerCase().includes(q);
-        if (!matchesWord && !matchesMeaning && !matchesCategory) return false;
+        if (!matchesWord && !matchesMeaning && !matchesDefinition && !matchesCategory) return false;
       }
 
       return true;
@@ -244,7 +268,7 @@ export default function FlashcardsPage() {
     difficulty: "متوسط",
   });
 
-  const handleAIGenerateCards = async () => {
+  const handleAIGenerateCards = useCallback(async () => {
     try {
       toast({
         title: "جاري توليد بطاقات ذكية... 🤖",
@@ -261,9 +285,10 @@ export default function FlashcardsPage() {
       
       const data = await res.json();
       if (Array.isArray(data)) {
+        const timeVal = Date.now();
         const newCards: EnhancedFlashcard[] = data.map((item: any, idx: number) => ({
           ...item,
-          id: `fc-ai-${Date.now()}-${idx}`,
+          id: `fc-ai-${timeVal}-${idx}`,
           isPersonal: true
         }));
         
@@ -299,7 +324,7 @@ export default function FlashcardsPage() {
         variant: "destructive"
       });
     }
-  };
+  }, [personalCards, toast]);
 
   const savePersonalCards = (newList: EnhancedFlashcard[]) => {
     setPersonalCards(newList);
@@ -394,6 +419,7 @@ export default function FlashcardsPage() {
 
     const wordVal = newCard.word.trim();
     const meaningVal = newCard.meaningAr.trim();
+    const definitionEnVal = newCard.definitionEn?.trim() || "";
     const phoneticVal = newCard.phonetic?.trim() || "/.../";
     const partOfSpeechVal = (newCard.partOfSpeech as any) || "noun";
     const exampleEnVal = newCard.exampleEn?.trim() || `Example with ${wordVal}.`;
@@ -420,6 +446,7 @@ export default function FlashcardsPage() {
         phonetic: phoneticVal,
         partOfSpeech: partOfSpeechVal,
         meaningAr: meaningVal,
+        definitionEn: definitionEnVal,
         exampleEn: exampleEnVal,
         exampleAr: exampleArVal,
         category: categoryVal,
@@ -450,6 +477,7 @@ export default function FlashcardsPage() {
         phonetic: phoneticVal,
         partOfSpeech: partOfSpeechVal,
         meaningAr: meaningVal,
+        definitionEn: definitionEnVal,
         exampleEn: exampleEnVal,
         exampleAr: exampleArVal,
         category: categoryVal,
@@ -472,6 +500,7 @@ export default function FlashcardsPage() {
       phonetic: "",
       partOfSpeech: "noun",
       meaningAr: "",
+      definitionEn: "",
       exampleEn: "",
       exampleAr: "",
       category: "أكاديمي وSTEP",
@@ -479,17 +508,21 @@ export default function FlashcardsPage() {
     });
   };
 
-  const handleDeleteCard = (id: string) => {
-    const isPers = personalCards.some(c => c.id === id);
+  const handleDeleteCard = (id: string, word?: string) => {
+    const targetCard = cards.find(c => c.id === id) || (word ? cards.find(c => c.word?.trim().toLowerCase() === word.trim().toLowerCase()) : null);
+    const targetWord = word || targetCard?.word;
+    const isPers = personalCards.some(c => c.id === id || (targetWord && c.word?.trim().toLowerCase() === targetWord.trim().toLowerCase()));
+
     if (isPers) {
-      const updatedPersonal = personalCards.filter(c => c.id !== id);
+      const updatedPersonal = personalCards.filter(c => c.id !== id && (targetWord ? c.word?.trim().toLowerCase() !== targetWord.trim().toLowerCase() : true));
       savePersonalCards(updatedPersonal);
       toast({ title: "تم الحذف", description: "تم حذف البطاقة من قائمتك الخاصة بنجاح" });
     } else {
-      deleteStoredFlashcard(id, DEFAULT_FLASHCARDS);
-      setSharedCards(prev => prev.filter(c => c.id !== id));
-      toast({ title: "تم الحذف", description: "تم حذف البطاقة وحفظ التعديل سحابياً" });
+      deleteStoredFlashcard(id, targetWord, DEFAULT_FLASHCARDS);
+      setSharedCards(prev => prev.filter(c => c.id !== id && (targetWord ? c.word?.trim().toLowerCase() !== targetWord.trim().toLowerCase() : true)));
+      toast({ title: "تم الحذف", description: "تم حذف البطاقة وحفظ التعديل سحابياً بنجاح" });
     }
+    setDeleteVersion(v => v + 1);
     setMasteredIds(prev => prev.filter(mId => mId !== id));
     setReviewIds(prev => prev.filter(rId => rId !== id));
   };
@@ -1142,14 +1175,21 @@ export default function FlashcardsPage() {
                   </p>
                 </div>
 
-                {/* Example Box */}
-                {card.exampleEn ? (
-                  <div style={{ backgroundColor: "#f8fafc", border: "1.5px solid #e2e8f0", padding: layout.boxPadding, borderRadius: layout.boxRadius, boxSizing: "border-box", width: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                    <p style={{ fontSize: layout.exampleEnSize, fontWeight: "600", color: "#334155", margin: 0, padding: 0, lineHeight: "1.25", fontFamily: "'IBM Plex Sans', 'Plus Jakarta Sans', sans-serif" }}>
-                      "{card.exampleEn}"
-                    </p>
+                {/* Definition & Example Box */}
+                {(card.definitionEn || card.exampleEn) ? (
+                  <div style={{ backgroundColor: "#f8fafc", border: "1.5px solid #e2e8f0", padding: layout.boxPadding, borderRadius: layout.boxRadius, boxSizing: "border-box", width: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: "2px" }}>
+                    {card.definitionEn && (
+                      <p style={{ fontSize: layout.exampleEnSize, fontWeight: "700", color: "#3730a3", margin: 0, padding: 0, lineHeight: "1.2", fontFamily: "'IBM Plex Sans', 'Plus Jakarta Sans', sans-serif" }}>
+                        • {card.definitionEn}
+                      </p>
+                    )}
+                    {card.exampleEn && (
+                      <p style={{ fontSize: layout.exampleArSize, fontWeight: "600", color: "#475569", margin: 0, padding: 0, lineHeight: "1.2", fontFamily: "'IBM Plex Sans', 'Plus Jakarta Sans', sans-serif" }}>
+                        "{card.exampleEn}"
+                      </p>
+                    )}
                     {card.exampleAr && (
-                      <p style={{ fontSize: layout.exampleArSize, marginTop: "2px", margin: "2px 0 0 0", padding: 0, textAlign: "right", color: "#64748b", lineHeight: "1.2", fontFamily: "'IBM Plex Sans Arabic', 'Cairo', 'Tajawal', sans-serif" }} dir="rtl">
+                      <p style={{ fontSize: layout.exampleArSize, margin: 0, padding: 0, textAlign: "right", color: "#64748b", lineHeight: "1.2", fontFamily: "'IBM Plex Sans Arabic', 'Cairo', 'Tajawal', sans-serif" }} dir="rtl">
                         {card.exampleAr}
                       </p>
                     )}
@@ -1306,6 +1346,16 @@ export default function FlashcardsPage() {
                       value={newCard.meaningAr}
                       onChange={(e) => setNewCard({ ...newCard, meaningAr: e.target.value })}
                       required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">التعريف الإنجليزي البسيط (Simple Definition)</Label>
+                    <Input
+                      placeholder="e.g. Continuing to try even when it is hard."
+                      value={newCard.definitionEn || ""}
+                      onChange={(e) => setNewCard({ ...newCard, definitionEn: e.target.value })}
+                      dir="ltr"
                     />
                   </div>
 
@@ -1583,7 +1633,7 @@ export default function FlashcardsPage() {
                           <Volume2 className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleDeleteCard(currentCard.id)}
+                          onClick={() => handleDeleteCard(currentCard.id, currentCard.word)}
                           className="h-8 w-8 rounded-xl bg-muted hover:bg-red-500/15 text-muted-foreground hover:text-red-500 flex items-center justify-center transition-all"
                           title="حذف هذه البطاقة"
                         >
@@ -1592,13 +1642,18 @@ export default function FlashcardsPage() {
                       </div>
                     </div>
 
-                    <div className="text-center py-2 space-y-1">
+                    <div className="text-center py-2 space-y-2">
                       <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
                         {currentCard.partOfSpeech}
                       </span>
                       <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-foreground tracking-tight break-words leading-tight" dir="ltr">
                         {currentCard.word}
                       </h2>
+                      {currentCard.definitionEn && (
+                        <div className="max-w-md mx-auto mt-1.5 px-3.5 py-2 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs sm:text-sm font-semibold leading-snug" dir="ltr">
+                          💡 {currentCard.definitionEn}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-center text-[11px] text-muted-foreground font-medium gap-1.5 pt-2 border-t border-border/30">
@@ -1637,8 +1692,32 @@ export default function FlashcardsPage() {
                         {currentCard.meaningAr}
                       </h3>
 
+                      {currentCard.definitionEn && (
+                        <div className="p-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-left space-y-0.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                              Simple English Definition
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                speakWord(currentCard.definitionEn!);
+                              }}
+                              className="h-6 w-6 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-600 dark:text-indigo-300 flex items-center justify-center transition-colors"
+                              title="استمع للتعريف"
+                            >
+                              <Volume2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <p className="text-xs sm:text-sm font-bold text-indigo-950 dark:text-indigo-200 leading-snug" dir="ltr">
+                            {currentCard.definitionEn}
+                          </p>
+                        </div>
+                      )}
+
                       {currentCard.exampleEn && (
-                        <div className="p-3 rounded-2xl bg-muted/50 border border-border/40 text-right space-y-1 mt-2">
+                        <div className="p-3 rounded-2xl bg-muted/50 border border-border/40 text-right space-y-1 mt-1.5">
                           <p className="text-xs sm:text-sm font-semibold text-foreground leading-snug" dir="ltr">
                             "{currentCard.exampleEn}"
                           </p>
@@ -1750,7 +1829,7 @@ export default function FlashcardsPage() {
                         <Volume2 className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDeleteCard(card.id)}
+                        onClick={() => handleDeleteCard(card.id, card.word)}
                         className="h-8 w-8 rounded-xl bg-muted/60 text-muted-foreground hover:text-red-500 flex items-center justify-center transition-colors"
                         title="حذف"
                       >
@@ -1759,12 +1838,17 @@ export default function FlashcardsPage() {
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-2xl bg-muted/40 space-y-1">
+                  <div className="p-3 rounded-2xl bg-muted/40 space-y-1.5">
                     <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
                       {card.meaningAr}
                     </p>
+                    {card.definitionEn && (
+                      <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1.5 rounded-xl leading-snug" dir="ltr">
+                        💡 {card.definitionEn}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground line-clamp-2" dir="ltr">
-                      {card.exampleEn}
+                      "{card.exampleEn}"
                     </p>
                   </div>
 

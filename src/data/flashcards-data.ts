@@ -4,13 +4,14 @@ export interface Flashcard {
   phonetic: string;
   partOfSpeech: "noun" | "verb" | "adjective" | "adverb" | "phrase";
   meaningAr: string;
+  definitionEn?: string;
   exampleEn: string;
   exampleAr: string;
   category: string;
   difficulty: "سهل" | "متوسط" | "متقدم";
 }
 
-export const FLASHCARDS_VERSION = "unit1_mega_goal_v4";
+export const FLASHCARDS_VERSION = "unit1_mega_goal_v6";
 
 export const DEFAULT_FLASHCARDS: Flashcard[] = [
   // ================= الأسماء (Nouns) =================
@@ -20,8 +21,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/əˈɡreʃ.ən/",
     partOfSpeech: "noun",
     meaningAr: "عدوان / اعتداء",
-    exampleEn: "The international treaty aimed to prevent cross-border aggression.",
-    exampleAr: "هدفت المعاهدة الدولية إلى منع العدوان والاعتداء عبر الحدود.",
+    definitionEn: "Angry or violent behavior toward others.",
+    exampleEn: "Fighting is a form of aggression.",
+    exampleAr: "القتال هو شكل من أشكال العدوان.",
     category: "الأسماء (Nouns)",
     difficulty: "متوسط"
   },
@@ -31,8 +33,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˌeɪ.viˈeɪ.ʃən/",
     partOfSpeech: "noun",
     meaningAr: "الطيران",
-    exampleEn: "The Wright brothers made historic contributions to the science of aviation.",
-    exampleAr: "قدّم الأخوان رايت إسهامات تاريخية في علم الطيران.",
+    definitionEn: "Making and flying airplanes.",
+    exampleEn: "Aviation makes world travel fast and easy.",
+    exampleAr: "الطيران يجعل السفر حول العالم سريعاً وسهلاً.",
     category: "الأسماء (Nouns)",
     difficulty: "متوسط"
   },
@@ -42,8 +45,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/kənˈtent.mənt/",
     partOfSpeech: "noun",
     meaningAr: "الرضا / القناعة",
-    exampleEn: "Real contentment comes from appreciating the simple blessings in life.",
-    exampleAr: "الرضا والقناعة الحقيقية تنبع من تقدير النعم البسيطة في الحياة.",
+    definitionEn: "A feeling of quiet happiness and satisfaction.",
+    exampleEn: "He smiled with contentment after finishing his work.",
+    exampleAr: "ابتسم برضا وقناعة بعد إنهاء عمله.",
     category: "الأسماء (Nouns)",
     difficulty: "متوسط"
   },
@@ -53,8 +57,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/dɪˈfɪʃ.ən.siz/",
     partOfSpeech: "noun",
     meaningAr: "أوجه القصور / النواقص",
-    exampleEn: "The medical tests identified key nutritional deficiencies in his diet.",
-    exampleAr: "حددت الفحوصات الطبية أوجه القصور والنواقص الغذائية في نظامه الغذائي.",
+    definitionEn: "A lack of something that is needed.",
+    exampleEn: "Poor food can cause vitamin deficiencies.",
+    exampleAr: "الطعام غير الصحي قد يسبب نقصاً في الفيتامينات.",
     category: "الأسماء (Nouns)",
     difficulty: "متقدم"
   },
@@ -64,8 +69,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈel.ɪ.mənts/",
     partOfSpeech: "noun",
     meaningAr: "عناصر",
-    exampleEn: "Trust and mutual respect are essential elements of successful teamwork.",
-    exampleAr: "الثقة والاحترام المتبادل هما عنصران أساسيان لنجاح العمل الجماعي.",
+    definitionEn: "Basic parts of something.",
+    exampleEn: "Honesty and trust are key elements of friendship.",
+    exampleAr: "الصدق والثقة هما عنصران أساسيان للصداقة.",
     category: "الأسماء (Nouns)",
     difficulty: "سهل"
   },
@@ -75,8 +81,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˌmɒr.əl ˈfaɪ.bər/",
     partOfSpeech: "noun",
     meaningAr: "النزاهة الأخلاقية / الخُلُق",
-    exampleEn: "A great leader must have the moral fiber to make principled decisions.",
-    exampleAr: "يجب أن يتمتع القائد العظيم بالنزاهة الأخلاقية والخُلُق القويم لاتخاذ قرارات مبدئية.",
+    definitionEn: "Inner strength to do what is right.",
+    exampleEn: "A good leader has strong moral fiber.",
+    exampleAr: "القائد الجيد يتمتع بنزاهة أخلاقية قوية.",
     category: "الأسماء (Nouns)",
     difficulty: "متقدم"
   },
@@ -86,8 +93,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈɡlaɪ.dər/",
     partOfSpeech: "noun",
     meaningAr: "طائرة شراعية",
-    exampleEn: "He soared peacefully above the green valley in an unpowered glider.",
-    exampleAr: "حلّق بسلام فوق الوادي الأخضر على متن طائرة شراعية خفيفة.",
+    definitionEn: "A light plane that flies without an engine.",
+    exampleEn: "The glider flew quietly in the sky.",
+    exampleAr: "حلّقت الطائرة الشراعية بهدوء في السماء.",
     category: "الأسماء (Nouns)",
     difficulty: "سهل"
   },
@@ -97,8 +105,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈleftˌoʊ.vərz/",
     partOfSpeech: "noun",
     meaningAr: "بقايا الطعام",
-    exampleEn: "We packed the dinner leftovers in glass containers for lunch tomorrow.",
-    exampleAr: "قمنا بتعبئة بقايا طعام العشاء في أوعية زجاجية لتناولها في الغداء غداً.",
+    definitionEn: "Food remaining uneaten after a meal.",
+    exampleEn: "We ate the dinner leftovers for lunch.",
+    exampleAr: "تناولنا بقايا طعام العشاء في وجبة الغداء.",
     category: "الأسماء (Nouns)",
     difficulty: "سهل"
   },
@@ -108,8 +117,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˌɒp.ərˈeɪ.ʃən/",
     partOfSpeech: "noun",
     meaningAr: "عملية / إجراء",
-    exampleEn: "The emergency rescue operation was carried out with extreme care.",
-    exampleAr: "نُفذت عملية الإنقاذ الطارئة وإجراءاتها بأقصى درجات العناية والحرص.",
+    definitionEn: "A planned action or medical surgery.",
+    exampleEn: "The doctor performed a successful operation.",
+    exampleAr: "أجرى الطبيب عملية ناجحة.",
     category: "الأسماء (Nouns)",
     difficulty: "سهل"
   },
@@ -119,8 +129,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˌpiː.diˈæt.rɪk/",
     partOfSpeech: "noun",
     meaningAr: "طب الأطفال",
-    exampleEn: "She decided to dedicate her medical career to pediatric healthcare.",
-    exampleAr: "قررت تكريس مسيرتها الطبية لمجال طب الأطفال ورعايتهم الصحية.",
+    definitionEn: "Medical care for babies and children.",
+    exampleEn: "She works in a pediatric hospital.",
+    exampleAr: "هي تعمل في مستشفى لطب الأطفال.",
     category: "الأسماء (Nouns)",
     difficulty: "متوسط"
   },
@@ -130,8 +141,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈsɜː.dʒən/",
     partOfSpeech: "noun",
     meaningAr: "جرّاح",
-    exampleEn: "The skilled surgeon successfully performed the complex heart surgery.",
-    exampleAr: "أجرى الجرّاح الماهر عملية القلب المعقدة بنجاح تام.",
+    definitionEn: "A doctor who performs medical operations.",
+    exampleEn: "The surgeon saved the patient's life.",
+    exampleAr: "أنقذ الجرّاح حياة المريض.",
     category: "الأسماء (Nouns)",
     difficulty: "متوسط"
   },
@@ -141,8 +153,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˌpaɪəˈnɪər/",
     partOfSpeech: "noun",
     meaningAr: "رائد",
-    exampleEn: "Marie Curie was a scientific pioneer in the discovery of radioactivity.",
-    exampleAr: "كانت ماري كوري رائدة علمية في اكتشاف النشاط الإشعاعي.",
+    definitionEn: "The first person to explore or do something new.",
+    exampleEn: "Marie Curie was a pioneer in science.",
+    exampleAr: "كانت ماري كوري رائدة في مجال العلوم.",
     category: "الأسماء (Nouns)",
     difficulty: "سهل"
   },
@@ -152,8 +165,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈpred.ə.tərz/",
     partOfSpeech: "noun",
     meaningAr: "الحيوانات المفترسة",
-    exampleEn: "Lions, wolves, and tigers are apex predators in the animal kingdom.",
-    exampleAr: "الأسود والذئاب والنمور هي حيوانات مفترسة قمة في المملكة الحيوانية.",
+    definitionEn: "Animals that hunt and eat other animals.",
+    exampleEn: "Lions and sharks are strong predators.",
+    exampleAr: "الأسود وأسماك القرش حيوانات مفترسة قوية.",
     category: "الأسماء (Nouns)",
     difficulty: "متوسط"
   },
@@ -163,8 +177,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/prəˈpel.ər/",
     partOfSpeech: "noun",
     meaningAr: "مروحة دافعة",
-    exampleEn: "The vintage aircraft is powered by a twin-blade spinning propeller.",
-    exampleAr: "تعمل الطائرة الكلاسيكية بواسطة مروحة دافعة دوارة ثنائية الشفرات.",
+    definitionEn: "Spinning blades that push a plane or boat.",
+    exampleEn: "The plane's propeller spins very fast.",
+    exampleAr: "مروحة الطائرة الدافعة تدور بسرعة كبيرة.",
     category: "الأسماء (Nouns)",
     difficulty: "متوسط"
   },
@@ -174,8 +189,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˌreɪ.di.oʊ.ækˈtɪv.ə.ti/",
     partOfSpeech: "noun",
     meaningAr: "النشاط الإشعاعي",
-    exampleEn: "Special sensors are placed around the lab to monitor radioactivity levels.",
-    exampleAr: "توضع أجهزة استشعار خاصة حول المختبر لمراقبة مستويات النشاط الإشعاعي.",
+    definitionEn: "Energy and rays given off by certain atoms.",
+    exampleEn: "High radioactivity is dangerous to health.",
+    exampleAr: "النشاط الإشعاعي المرتفع خطير على الصحة.",
     category: "الأسماء (Nouns)",
     difficulty: "متقدم"
   },
@@ -185,8 +201,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈstrʌɡ.əl/",
     partOfSpeech: "noun",
     meaningAr: "صراع / معاناة",
-    exampleEn: "Their prolonged struggle for equal educational opportunities inspired millions.",
-    exampleAr: "ألهم صراعهم ومعاناتهم الطويلة من أجل فرص تعليم متكافئة الملايين.",
+    definitionEn: "A very hard fight or effort to do something.",
+    exampleEn: "Success often comes after a long struggle.",
+    exampleAr: "النجاح غالباً ما يأتي بعد كفاح وصراع طويل.",
     category: "الأسماء (Nouns)",
     difficulty: "متوسط"
   },
@@ -196,8 +213,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˌsɪm.baɪˈoʊ.sɪs/",
     partOfSpeech: "noun",
     meaningAr: "تعايش تكافلي",
-    exampleEn: "The mutual partnership between bees and flowers is a classic symbiosis.",
-    exampleAr: "الشراكة المتبادلة بين النحل والزهور هي نموذج كلاسيكي للتعايش التكافلي.",
+    definitionEn: "Two different living things helping each other live.",
+    exampleEn: "Bees and flowers live in symbiosis.",
+    exampleAr: "النحل والأزهار يعيشون في تعايش تكافلي.",
     category: "الأسماء (Nouns)",
     difficulty: "متقدم"
   },
@@ -207,8 +225,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈten.tə.kəlz/",
     partOfSpeech: "noun",
     meaningAr: "مجسات / لوامس",
-    exampleEn: "The giant octopus uses its flexible tentacles to capture food.",
-    exampleAr: "يستخدم الأخطبوط العملاق لوامسه ومجساته المرنة للإمساك بطعامه.",
+    definitionEn: "Long, flexible arms of sea animals like an octopus.",
+    exampleEn: "An octopus has eight long tentacles.",
+    exampleAr: "يمتلك الأخطبوط ثمانية مجسات طويلة.",
     category: "الأسماء (Nouns)",
     difficulty: "متوسط"
   },
@@ -220,8 +239,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈtʃʌk.əl/",
     partOfSpeech: "verb",
     meaningAr: "يضحك ضحكة خفيفة",
-    exampleEn: "He began to chuckle softly at his friend's witty remark.",
-    exampleAr: "بدأ يضحك ضحكة خفيفة بهدوء على تعليق صديقه الذكي.",
+    definitionEn: "To laugh quietly.",
+    exampleEn: "The funny story made him chuckle.",
+    exampleAr: "القصة الطريفة جعلته يضحك ضحكة خفيفة.",
     category: "الأفعال (Verbs)",
     difficulty: "سهل"
   },
@@ -231,8 +251,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈkɒm.pən.seɪt/",
     partOfSpeech: "verb",
     meaningAr: "يعوّض",
-    exampleEn: "The airline company agreed to compensate passengers for the delayed flight.",
-    exampleAr: "وافقت شركة الطيران على تعويض المسافرين عن تأخر الرحلة.",
+    definitionEn: "To make up for a loss or damage.",
+    exampleEn: "The company will compensate him for the damage.",
+    exampleAr: "ستعوّضه الشركة عن الضرر.",
     category: "الأفعال (Verbs)",
     difficulty: "متوسط"
   },
@@ -242,8 +263,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈɒn.ər/",
     partOfSpeech: "verb",
     meaningAr: "يكرّم / يحترم",
-    exampleEn: "The school will honor top-achieving students at the end-of-year ceremony.",
-    exampleAr: "ستكرّم المدرسة وتحتفي بالطلاب المتفوقين في حفل نهاية العام.",
+    definitionEn: "To show great respect for someone.",
+    exampleEn: "The school will honor the best students.",
+    exampleAr: "ستكرّم المدرسة أفضل الطلاب.",
     category: "الأفعال (Verbs)",
     difficulty: "سهل"
   },
@@ -253,8 +275,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/rɪˈdʒekt/",
     partOfSpeech: "verb",
     meaningAr: "يرفض",
-    exampleEn: "The editorial committee decided to reject any unverified research papers.",
-    exampleAr: "قررت هيئة التحرير رفض أي أوراق بحثية غير مثبتة وموثقة.",
+    definitionEn: "To say no to something or refuse to accept it.",
+    exampleEn: "He decided to reject the offer.",
+    exampleAr: "قرر أن يرفض العرض.",
     category: "الأفعال (Verbs)",
     difficulty: "سهل"
   },
@@ -264,8 +287,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/swuːp/",
     partOfSpeech: "verb",
     meaningAr: "ينقضّ / يهوي بسرعة",
-    exampleEn: "The falcon began to swoop down swiftly to catch its prey.",
-    exampleAr: "بدأ الصقر ينقضّ ويهوي بسرعة خاطفة للإمساك بفريسته.",
+    definitionEn: "To fly down quickly to catch something.",
+    exampleEn: "Eagles swoop down to catch fish.",
+    exampleAr: "تنقضّ النسور بسرعة للإمساك بالأسماك.",
     category: "الأفعال (Verbs)",
     difficulty: "متوسط"
   },
@@ -277,8 +301,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/əˈkjuːt/",
     partOfSpeech: "adjective",
     meaningAr: "حاد / شديد",
-    exampleEn: "The athlete experienced acute pain in his shoulder after the match.",
-    exampleAr: "شعر الرياضي بألم حاد وشديد في كتفه بعد المباراة.",
+    definitionEn: "Very strong, sharp, or serious.",
+    exampleEn: "Dogs have an acute sense of smell.",
+    exampleAr: "تمتلك الكلاب حاسة شمّ حادة وقوية.",
     category: "الصفات (Adjectives)",
     difficulty: "متوسط"
   },
@@ -288,8 +313,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/dɪˈvoʊ.tɪd/",
     partOfSpeech: "adjective",
     meaningAr: "مخلص / متفانٍ",
-    exampleEn: "She is a devoted teacher who puts extra effort into helping every student.",
-    exampleAr: "إنها معلمة مخلصة ومتفانية تبذل جهداً إضافياً لمساعدة كل طالب.",
+    definitionEn: "Very loving, loyal, and caring.",
+    exampleEn: "He is a devoted friend who always helps.",
+    exampleAr: "إنه صديق مخلص ومتفانٍ يساعد دائماً.",
     category: "الصفات (Adjectives)",
     difficulty: "سهل"
   },
@@ -299,8 +325,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ɪkˌsper.ɪˈmen.təl/",
     partOfSpeech: "adjective",
     meaningAr: "تجريبي",
-    exampleEn: "The research lab is testing an experimental renewable energy system.",
-    exampleAr: "يختبر مختبر الأبحاث نظاماً تجريبياً للطاقة المتجددة.",
+    definitionEn: "New and still being tested.",
+    exampleEn: "Doctors are testing an experimental medicine.",
+    exampleAr: "يختبر الأطباء دواءً تجريبياً جديداً.",
     category: "الصفات (Adjectives)",
     difficulty: "متوسط"
   },
@@ -310,8 +337,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ɪkˈsten.sɪv/",
     partOfSpeech: "adjective",
     meaningAr: "واسع / شامل",
-    exampleEn: "The medical team conducted extensive research before publishing their results.",
-    exampleAr: "أجرى الفريق الطبي بحثاً واسعاً وشاملاً قبل نشر نتائجهم.",
+    definitionEn: "Large in size, amount, or range.",
+    exampleEn: "She has extensive knowledge of English.",
+    exampleAr: "لديها معرفة واسعة وشاملة باللغة الإنجليزية.",
     category: "الصفات (Adjectives)",
     difficulty: "متوسط"
   },
@@ -321,8 +349,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈfɪə.səm/",
     partOfSpeech: "adjective",
     meaningAr: "مخيف / مرعب",
-    exampleEn: "The roaring lion presented a fearsome sight to anyone nearby.",
-    exampleAr: "شكّل زئير الأسد مشهداً مخيفاً ومرعباً لأي شخص بالقرب منه.",
+    definitionEn: "Very scary or frightening.",
+    exampleEn: "The lion is a fearsome animal.",
+    exampleAr: "الأسد حيوان مخيف ومرعب.",
     category: "الصفات (Adjectives)",
     difficulty: "متوسط"
   },
@@ -332,8 +361,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈflʌs.tərd/",
     partOfSpeech: "adjective",
     meaningAr: "مرتبك / مضطرب",
-    exampleEn: "The speaker became flustered when he forgot his opening notes.",
-    exampleAr: "أصبح المتحدث مرتبكاً ومضطرباً عندما نسي ملاحظاته الافتتاحية.",
+    definitionEn: "Nervous, confused, and upset.",
+    exampleEn: "He felt flustered when he forgot his keys.",
+    exampleAr: "شعر بالارتباك والاضطراب عندما نسي مفاتيحه.",
     category: "الصفات (Adjectives)",
     difficulty: "متوسط"
   },
@@ -343,8 +373,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ɪnˈvæl.ju.ə.bəl/",
     partOfSpeech: "adjective",
     meaningAr: "لا يُقدّر بثمن / قيّم جدًا",
-    exampleEn: "Her experienced advice proved invaluable to the success of our project.",
-    exampleAr: "أثبتت نصيحتها الخبيرة أنها لا تُقدّر بثمن وقيّمة جداً لنجاح مشروعنا.",
+    definitionEn: "Extremely useful and valuable.",
+    exampleEn: "Good health is an invaluable blessing.",
+    exampleAr: "الصحة الجيدة نعمة قيّمة لا تُقدّر بثمن.",
     category: "الصفات (Adjectives)",
     difficulty: "متقدم"
   },
@@ -354,8 +385,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˈledʒ.ən.der.i/",
     partOfSpeech: "adjective",
     meaningAr: "أسطوري",
-    exampleEn: "King Faisal's legendary leadership left a lasting impact on education.",
-    exampleAr: "تركت قيادة الملك فيصل الأسطورية أثراً دائماً على مسيرة التعليم.",
+    definitionEn: "Very famous and admired by many people.",
+    exampleEn: "He is a legendary football player.",
+    exampleAr: "إنه لاعب كرة قدم أسطوري ومشهور.",
     category: "الصفات (Adjectives)",
     difficulty: "سهل"
   },
@@ -365,8 +397,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/rɪˈlaɪ.ə.bəl/",
     partOfSpeech: "adjective",
     meaningAr: "موثوق",
-    exampleEn: "A reliable reference book is essential when studying for English exams.",
-    exampleAr: "المرجع العلمي الموثوق ضروري جداً عند المذاكرة لاختبارات اللغة الإنجليزية.",
+    definitionEn: "Can be trusted to work well or do what is expected.",
+    exampleEn: "Ali is a reliable person you can trust.",
+    exampleAr: "عليّ شخص موثوق يمكنك الاعتماد عليه.",
     category: "الصفات (Adjectives)",
     difficulty: "سهل"
   },
@@ -376,67 +409,11 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ˌsɪm.baɪˈɒt.ɪk/",
     partOfSpeech: "adjective",
     meaningAr: "تكافلي",
-    exampleEn: "The two organizations established a symbiotic partnership that benefited both.",
-    exampleAr: "أسست المنظمتان شراكة تكافلية عادت بالنفع الكبير على كلا الطرفين.",
+    definitionEn: "Helping each other in a close relationship.",
+    exampleEn: "Bees and flowers have a symbiotic relationship.",
+    exampleAr: "بين النحل والأزهار علاقة تكافلية متبادلة.",
     category: "الصفات (Adjectives)",
     difficulty: "متقدم"
-  },
-
-  // ================= عبارات التفاوض (Negotiating Expressions) =================
-  {
-    id: "fc-expr-neg-1",
-    word: "How about if I... and you...?",
-    phonetic: "/haʊ əˈbaʊt ɪf aɪ... ənd juː...?/",
-    partOfSpeech: "phrase",
-    meaningAr: "ما رأيك أن أفعل... وأنت تفعل...؟",
-    exampleEn: "How about if I write the summary and you design the presentation slides?",
-    exampleAr: "ما رأيك أن أقوم أنا بكتابة الملخص وأنت تقوم بتصميم شرائح العرض؟",
-    category: "التفاوض (Negotiating)",
-    difficulty: "متوسط"
-  },
-  {
-    id: "fc-expr-neg-2",
-    word: "I think it would be fair if...",
-    phonetic: "/aɪ θɪŋk ɪt wʊd biː feər ɪf.../",
-    partOfSpeech: "phrase",
-    meaningAr: "أعتقد أنه سيكون من العادل أن...",
-    exampleEn: "I think it would be fair if we divided the assignment tasks equally.",
-    exampleAr: "أعتقد أنه سيكون من العادل والإنصاف أن نقسم مهام الواجب بالتساوي.",
-    category: "التفاوض (Negotiating)",
-    difficulty: "متوسط"
-  },
-  {
-    id: "fc-expr-neg-3",
-    word: "I'm sure we can work this out.",
-    phonetic: "/aɪm ʃʊər wiː kæn wɜːk ðɪs aʊt/",
-    partOfSpeech: "phrase",
-    meaningAr: "أنا متأكد أننا نستطيع حلّ هذا الأمر.",
-    exampleEn: "Don't worry about the slight misunderstanding; I'm sure we can work this out.",
-    exampleAr: "لا تقلق بشأن سوء التفاهم البسيط؛ أنا متأكد أننا نستطيع حلّ هذا الأمر معاً.",
-    category: "التفاوض (Negotiating)",
-    difficulty: "متوسط"
-  },
-  {
-    id: "fc-expr-neg-4",
-    word: "OK, I'll agree to... if you will...",
-    phonetic: "/oʊˈkeɪ aɪl əˈɡriː tuː... ɪf juː wɪl.../",
-    partOfSpeech: "phrase",
-    meaningAr: "حسنًا، سأوافق على... إذا وافقتَ على...",
-    exampleEn: "OK, I'll agree to present first if you will answer the audience questions.",
-    exampleAr: "حسنًا، سأوافق على التقديم أولاً إذا وافقتَ على الإجابة على أسئلة الجمهور.",
-    category: "التفاوض (Negotiating)",
-    difficulty: "متوسط"
-  },
-  {
-    id: "fc-expr-neg-5",
-    word: "Would you (be willing to)... if I...?",
-    phonetic: "/wʊd juː biː ˈwɪl.ɪŋ tuː... ɪf aɪ...?/",
-    partOfSpeech: "phrase",
-    meaningAr: "هل ستكون مستعدًا لـ... إذا أنا...؟",
-    exampleEn: "Would you be willing to review my essay if I summarize chapter three for you?",
-    exampleAr: "هل ستكون مستعدًا لمراجعة مقالي إذا قمتُ أنا بتلخيص الفصل الثالث لك؟",
-    category: "التفاوض (Negotiating)",
-    difficulty: "متوسط"
   },
 
   // ================= كلام واقعي / تعبيرات عامية (Real Talk) =================
@@ -446,8 +423,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/noʊ swet/",
     partOfSpeech: "phrase",
     meaningAr: "لا مشكلة / الأمر سهل.",
-    exampleEn: "Thank you so much for helping me study! — No sweat, anytime!",
-    exampleAr: "شكراً جزيلاً لك على مساعدتي في المذاكرة! — لا مشكلة، الأمر سهل في أي وقت!",
+    definitionEn: "No problem; it is easy to do.",
+    exampleEn: "Can you help me? — Sure, no sweat!",
+    exampleAr: "هل يمكنك مساعدتي؟ — بالتأكيد، لا مشكلة والأمر سهل!",
     category: "كلام واقعي (Real Talk)",
     difficulty: "سهل"
   },
@@ -457,8 +435,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/nɒt maɪ kʌp ɒv tiː/",
     partOfSpeech: "phrase",
     meaningAr: "هذا ليس من اهتماماتي / ليس الشيء الذي أحبه.",
-    exampleEn: "Watching horror films is definitely not my cup of tea.",
-    exampleAr: "مشاهدة أفلام الرعب ليست من اهتماماتي على الإطلاق ولا الشيء الذي أحبه.",
+    definitionEn: "Something that I do not like or enjoy.",
+    exampleEn: "Video games are not my cup of tea.",
+    exampleAr: "ألعاب الفيديو ليست من اهتماماتي.",
     category: "كلام واقعي (Real Talk)",
     difficulty: "سهل"
   },
@@ -468,8 +447,9 @@ export const DEFAULT_FLASHCARDS: Flashcard[] = [
     phonetic: "/ɒn ðə seɪm ˈweɪv.leŋθ/",
     partOfSpeech: "phrase",
     meaningAr: "متفقان في التفكير / نفكر بالطريقة نفسها.",
-    exampleEn: "From our very first discussion, we realized we were on the same wavelength.",
-    exampleAr: "منذ أول مناقشة بيننا، أدركنا أننا متفقان في التفكير ونفكر بالطريقة نفسها تماماً.",
+    definitionEn: "Thinking in the same way and understanding each other.",
+    exampleEn: "My friend and I are always on the same wavelength.",
+    exampleAr: "أنا وصديقي دائماً متفقان في التفكير.",
     category: "كلام واقعي (Real Talk)",
     difficulty: "متوسط"
   }

@@ -248,9 +248,9 @@ export function LibraryTab() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(item => (
+          {filtered.map((item, idx) => (
             <Card
-              key={item.id}
+              key={`${item.id || "file"}-${idx}`}
               className="p-5 rounded-2xl border-border/60 bg-card hover:border-primary/40 transition-all flex flex-col justify-between"
             >
               <div>

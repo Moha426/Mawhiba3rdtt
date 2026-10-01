@@ -54,14 +54,27 @@ export function FlashcardsTab() {
   const [formPhonetic, setFormPhonetic] = useState("");
   const [formPartOfSpeech, setFormPartOfSpeech] = useState<"noun" | "verb" | "adjective" | "adverb" | "phrase">("noun");
   const [formMeaningAr, setFormMeaningAr] = useState("");
+  const [formDefinitionEn, setFormDefinitionEn] = useState("");
   const [formExampleEn, setFormExampleEn] = useState("");
   const [formExampleAr, setFormExampleAr] = useState("");
   const [formCategory, setFormCategory] = useState("الأسماء (Nouns)");
   const [formDifficulty, setFormDifficulty] = useState<"سهل" | "متوسط" | "متقدم">("متوسط");
 
-  // Clean cards list: official curriculum cards (41) + genuine custom/admin cards only
+  // Clean cards list: official curriculum cards + genuine custom/admin cards only (excluding deleted)
   const cleanCards = useMemo(() => {
-    const defaultIds = new Set(DEFAULT_FLASHCARDS.map(d => d.id));
+    const defaultMap = new Map(DEFAULT_FLASHCARDS.map(d => [d.id, d]));
+    const deletedIds = getDeletedFlashcardIds();
+    const deletedWords = getDeletedFlashcardWords();
+
+    const isNotDeleted = (c: any) => {
+      if (!c || !c.id) return false;
+      if (deletedIds.has(String(c.id))) return false;
+      if (c.word && deletedWords.has(String(c.word).trim().toLowerCase())) return false;
+      if (String(c.id).startsWith("fc-expr-neg-")) return false;
+      if (/^fc-\d+$/.test(String(c.id)) || /^fc-u1-\d+$/.test(String(c.id))) return false;
+      return true;
+    };
+
     const isCustomCard = (c: any) =>
       c && c.id && (
         c.isCustom ||
@@ -72,7 +85,12 @@ export function FlashcardsTab() {
         String(c.id).startsWith("fc-ai-") ||
         String(c.id).startsWith("fc-imported-")
       );
-    return cards.filter(c => c && c.id && (defaultIds.has(c.id) || isCustomCard(c)));
+    return cards
+      .filter(c => c && c.id && (defaultMap.has(c.id) || isCustomCard(c)) && isNotDeleted(c))
+      .map(c => {
+        const defCard = defaultMap.get(c.id);
+        return defCard ? { ...defCard, ...c, definitionEn: c.definitionEn || defCard.definitionEn } : c;
+      });
   }, [cards]);
 
   // Get categories list
@@ -90,13 +108,14 @@ export function FlashcardsTab() {
         const q = search.toLowerCase().trim();
         const matchesWord = card.word.toLowerCase().includes(q);
         const matchesAr = card.meaningAr.includes(q);
+        const matchesDef = card.definitionEn?.toLowerCase().includes(q);
         const matchesExEn = card.exampleEn?.toLowerCase().includes(q);
         const matchesCategory = card.category.toLowerCase().includes(q);
-        if (!matchesWord && !matchesAr && !matchesExEn && !matchesCategory) return false;
+        if (!matchesWord && !matchesAr && !matchesDef && !matchesExEn && !matchesCategory) return false;
       }
       return true;
     });
-  }, [cards, selectedCategory, selectedDifficulty, search]);
+  }, [cleanCards, selectedCategory, selectedDifficulty, search]);
 
   const handleOpenAdd = () => {
     setEditingCard(null);
@@ -104,6 +123,7 @@ export function FlashcardsTab() {
     setFormPhonetic("");
     setFormPartOfSpeech("noun");
     setFormMeaningAr("");
+    setFormDefinitionEn("");
     setFormExampleEn("");
     setFormExampleAr("");
     setFormCategory("أكاديمي وSTEP");
@@ -117,6 +137,7 @@ export function FlashcardsTab() {
     setFormPhonetic(card.phonetic || "");
     setFormPartOfSpeech(card.partOfSpeech || "noun");
     setFormMeaningAr(card.meaningAr);
+    setFormDefinitionEn(card.definitionEn || "");
     setFormExampleEn(card.exampleEn || "");
     setFormExampleAr(card.exampleAr || "");
     setFormCategory(card.category);
@@ -145,6 +166,7 @@ export function FlashcardsTab() {
             phonetic: formPhonetic.trim() || "/.../",
             partOfSpeech: formPartOfSpeech,
             meaningAr: formMeaningAr.trim(),
+            definitionEn: formDefinitionEn.trim() || c.definitionEn || "",
             exampleEn: formExampleEn.trim() || `Example with ${formWord.trim()}.`,
             exampleAr: formExampleAr.trim() || `جملة توضيحية للكلمة ${formWord.trim()}.`,
             category: formCategory.trim() || "عام",
@@ -175,6 +197,7 @@ export function FlashcardsTab() {
         phonetic: formPhonetic.trim() || "/.../",
         partOfSpeech: formPartOfSpeech,
         meaningAr: formMeaningAr.trim(),
+        definitionEn: formDefinitionEn.trim(),
         exampleEn: formExampleEn.trim() || `Example with ${wordClean}.`,
         exampleAr: formExampleAr.trim() || `جملة توضيحية للكلمة ${wordClean}.`,
         category: formCategory.trim() || "عام",
@@ -189,17 +212,23 @@ export function FlashcardsTab() {
   };
 
   const handleDeleteCard = (id: string, word: string) => {
-    deleteStoredFlashcard(id);
-    setCards(prev => prev.filter(c => String(c.id) !== String(id)));
-    toast({ title: "تم الحذف", description: `تم حذف كلمة "${word}" بنجاح وحفظ الحذف بالسحابة.` });
+    deleteStoredFlashcard(id, word, DEFAULT_FLASHCARDS);
+    const updated = cards.filter(c => String(c.id) !== String(id) && (word ? c.word?.trim().toLowerCase() !== word.trim().toLowerCase() : true));
+    updateCardsList(updated);
+    toast({ title: "تم الحذف 🗑️", description: `تم حذف كلمة "${word}" نهائياً وحفظ التعديل سحابياً.` });
   };
 
   const handleResetToDefaults = () => {
+    // Clear deleted items
+    try {
+      localStorage.removeItem("talented_english_deleted_ids_v1");
+      localStorage.removeItem("talented_english_deleted_words_v1");
+    } catch {}
     // Preserve custom cards created by the user or imported, replace defaults with official curriculum
     const customCards = cards.filter(c => c && c.id && (c.isCustom || String(c.id).startsWith("custom_") || String(c.id).startsWith("fc-imported-")));
     const merged = [...DEFAULT_FLASHCARDS, ...customCards.filter(c => !DEFAULT_FLASHCARDS.some(d => d.id === c.id))];
     updateCardsList(merged);
-    toast({ title: "تم الاسترجاع والتحديث 🔄", description: "تم تحديث كافة كلمات بطاقات الإنجليزية وفق المنهج المعتمد (41 كلمة وعبارة)." });
+    toast({ title: "تم الاسترجاع والتحديث 🔄", description: `تم تحديث كافة كلمات بطاقات الإنجليزية وفق المنهج المعتمد (${DEFAULT_FLASHCARDS.length} كلمة وعبارة).` });
   };
 
   const handleExportJSON = () => {
@@ -387,6 +416,12 @@ export function FlashcardsTab() {
                 </span>
               </div>
 
+              {card.definitionEn && (
+                <div className="my-1.5 p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs font-bold text-indigo-700 dark:text-indigo-300 text-left dir-ltr">
+                  💡 {card.definitionEn}
+                </div>
+              )}
+
               {card.exampleEn && (
                 <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                   <p className="font-sans italic text-foreground/80 dir-ltr text-left bg-muted/20 p-2 rounded-lg">
@@ -527,6 +562,16 @@ export function FlashcardsTab() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">التعريف الإنجليزي البسيط (Simple English Definition)</Label>
+              <Input
+                placeholder="e.g. A thing done successfully with effort."
+                value={formDefinitionEn}
+                onChange={(e) => setFormDefinitionEn(e.target.value)}
+                className="rounded-xl text-xs dir-ltr"
+              />
             </div>
 
             <div className="space-y-1.5">
